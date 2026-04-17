@@ -1,0 +1,6 @@
+runtime:
+  seed: 3407
+  device: cuda
+  work_dir: outputs/default
+  log_interval: 20
+  max_epochs: 24

@@ -1,0 +1,13 @@
+*.mat
+*.pth
+*.pyc
+*.png
+*.mp4
+index*.json
+*.rar
+*.txt
+*.csv
+*.bak
+.cache/
+.ipynb_checkpoints/
+__pycache__/

@@ -1,0 +1,17 @@
+_base_:
+  - ../../base/runtime.yaml
+  - ../../datasets/radar_detection_sample.yaml
+  - ../../detectors/range_doppler_cnn.yaml
+  - ../../trackers/kalman_sort.yaml
+  - ../../strategies/detection_baseline.yaml
+
+experiment:
+  name: radardet_rdcnn_sort
+  stage: detection_with_tracking_eval
+
+runtime:
+  work_dir: outputs/radardet_rdcnn_sort
+
+strategy:
+  optimizer:
+    lr: 0.0001

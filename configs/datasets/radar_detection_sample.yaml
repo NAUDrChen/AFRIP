@@ -1,0 +1,14 @@
+dataset:
+  task: detection
+  name: radar_detection_sample
+  root: data/radar_detection_sample
+  loader:
+    type: RDSequenceLoader
+    batch_size: 4
+    num_workers: 4
+  train_transforms:
+    - type: NormalizeAmplitude
+    - type: RandomCrop2D
+      size: [256, 256]
+  val_transforms:
+    - type: NormalizeAmplitude

@@ -1,0 +1,10 @@
+tracker:
+  type: KalmanSORT
+  motion_model:
+    type: ConstantVelocityKalman
+  association:
+    type: HungarianIoU
+    iou_threshold: 0.3
+  track_management:
+    max_age: 30
+    min_hits: 3
