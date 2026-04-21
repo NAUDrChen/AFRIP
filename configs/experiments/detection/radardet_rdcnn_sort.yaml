@@ -1,7 +1,7 @@
 _base_:
   - ../../base/runtime.yaml
   - ../../datasets/radar_detection_sample.yaml
-  - ../../detectors/range_doppler_cnn.yaml
+  - ../../detectors/yolort_resnet18.yaml
   - ../../trackers/kalman_sort.yaml
   - ../../strategies/detection_baseline.yaml
 

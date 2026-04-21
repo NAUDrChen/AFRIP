@@ -11,3 +11,4 @@ index*.json
 .cache/
 .ipynb_checkpoints/
 __pycache__/
+oldprojectfiles/

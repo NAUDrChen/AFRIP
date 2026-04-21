@@ -1,0 +1,28 @@
+detector:
+  type: YOLORTv1
+  num_classes: 3
+  stride: 16
+  conf_thresh: 0.01
+  nms_thresh: 0.5
+  trainable: false
+  deploy: false
+  backbone_cfg:
+    type: ResNet18
+    in_channels: 1
+    pretrained: false
+    pretrained_path: null
+  neck_cfg:
+    type: SPPF
+    in_dim: 256
+    out_dim: 512
+    expand_ratio: 0.5
+    pooling_size: 5
+    act_type: lrelu
+    norm_type: BN
+  head_cfg:
+    type: DecoupledHead
+    num_cls_head: 2
+    num_reg_head: 2
+    act_type: lrelu
+    norm_type: BN
+    depthwise: false
