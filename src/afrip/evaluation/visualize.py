@@ -176,7 +176,8 @@ def visualize_full_predictions(dataset: RadarWindowDataset,
 def visualize_batch_with_full(dataset: RadarWindowDataset,
                               batch: Dict[str, Any],
                               complex_mode: str = "abs",
-                              max_per_batch: int = 8):
+                              max_per_batch: int = 8,
+                              image_is_normalized=True):
     """
     dB 转换: dB = 20 * log10(|A| + ε), ε ~ 1e-12 防止 log(0)
     归一显示: norm = clip((dB - p1)/(p99 - p1), 0, 1) 其中 p1,p99 为分位数增强对比度
@@ -244,13 +245,18 @@ def visualize_batch_with_full(dataset: RadarWindowDataset,
             else:
                 amp = img_t[0]
             amp = np.abs(amp)
-            db = 20.0 * np.log10(amp + eps)  # 20 log10(|A_slice| + ε)
-            vmin_w, vmax_w = np.percentile(db, [1, 99])
-            disp_w = np.clip((db - vmin_w) / (vmax_w - vmin_w + 1e-6), 0, 1)
+            if image_is_normalized:
+                disp_w = np.clip(amp, 0, 1)          # 已归一化，直接显示
+            else:
+                db = 20.0 * np.log10(amp + eps)      # 原始幅度，做 dB 变换
+                vmin_w, vmax_w = np.percentile(db, [1, 99])
+                disp_w = np.clip((db - vmin_w) / (vmax_w - vmin_w + 1e-6), 0, 1)
 
             ax.imshow(disp_w, cmap='viridis', origin='upper')
-            origin = metas[si]["global_origin"]
-            ax.set_title(f"Slice #{si}\ndB[{vmin_w:.1f},{vmax_w:.1f}]")
+            if image_is_normalized:
+                ax.set_title(f"Slice #{si}\n[normalized]")
+            else:
+                ax.set_title(f"Slice #{si}\ndB[{vmin_w:.1f},{vmax_w:.1f}]")
             ax.set_axis_off()
 
             for box in per_sample_boxes[si]:

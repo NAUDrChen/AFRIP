@@ -2,8 +2,8 @@ dataset:
   type: RadarWindowDataset
   mat_dir: G:\Data\data
   csv_path: G:\Data\data\data_mat.csv
-  window_size: [512, 512]
-  stride: [256, 256]
+  window_size: [640, 640]
+  stride: [640, 640]
   complex_mode: abs
   subset: train
   azimuth_split_ratio: 0.7
@@ -13,7 +13,7 @@ dataset:
 dataloader:
   batch_size: 4
   num_workers: 4
-  shuffle: true
+  shuffle: false
 
 train_transforms:
   - type: SeaClutterInjection
