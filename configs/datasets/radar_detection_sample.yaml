@@ -1,14 +1,28 @@
 dataset:
-  task: detection
-  name: radar_detection_sample
-  root: data/radar_detection_sample
-  loader:
-    type: RDSequenceLoader
-    batch_size: 4
-    num_workers: 4
-  train_transforms:
-    - type: NormalizeAmplitude
-    - type: RandomCrop2D
-      size: [256, 256]
-  val_transforms:
-    - type: NormalizeAmplitude
+  type: RadarWindowDataset
+  mat_dir: G:\Data\data
+  csv_path: G:\Data\data\data_mat.csv
+  window_size: [512, 512]
+  stride: [256, 256]
+  complex_mode: abs
+  subset: train
+  azimuth_split_ratio: 0.7
+  cache_mat_files: 4
+  filter_difficult: false
+
+dataloader:
+  batch_size: 4
+  num_workers: 4
+  shuffle: true
+
+train_transforms:
+  - type: SeaClutterInjection
+    prob: 0.7
+    snr_db_range: [5.0, 20.0]
+    background_only: false
+  - type: RandomVerticalFlip
+    prob: 0.5
+  - type: AmplitudeNormalize
+    mode: db_percentile
+  - type: PadToStride
+    stride: 32
