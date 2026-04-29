@@ -9,6 +9,10 @@ dataset:
   azimuth_split_ratio: 0.7
   cache_mat_files: 4
   filter_difficult: false
+  class_mapping:              # 对应旧版 DataConfig.class_mapping
+    mt: 0
+    wm: 1
+    uk: 2
 
 dataloader:
   batch_size: 4
@@ -26,3 +30,7 @@ train_transforms:
     mode: db_percentile
   - type: PadToStride
     stride: 32
+
+val_transforms:
+  - type: AmplitudeNormalize
+    mode: db_percentile

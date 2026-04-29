@@ -12,6 +12,15 @@ experiment:
 runtime:
   work_dir: outputs/radardet_rdcnn_sort
 
+# 实验级别覆盖（优先级最高，覆盖 _base_ 中的同名字段）
 strategy:
   optimizer:
-    lr: 0.0001
+    lr0: 0.0001               # 覆盖 detection_baseline 中的 lr0: 0.0003
+  train:
+    eval_interval: 1          # 每 epoch 评估一次
+    num_workers_train: 4
+  eval:
+    save_folder: outputs/radardet_rdcnn_sort/weights
+  vis_pred_full: false
+
+deterministic: true
