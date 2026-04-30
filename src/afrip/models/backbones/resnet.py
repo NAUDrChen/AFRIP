@@ -78,3 +78,57 @@ class ResNet18(ResNet):
             state_dict = torch.load(pretrained_path, map_location='cpu')
             state_dict = _adapt_first_conv_weight(state_dict, in_channels)
             self.load_state_dict(state_dict, strict=False)
+
+
+@BACKBONES.register("ResNet18Pyramid")
+class ResNet18Pyramid(nn.Module):
+    """ResNet-18 金字塔骨干，返回 stride=8/16 两个尺度特征。"""
+
+    out_channels = (128, 256)
+
+    def __init__(self, in_channels: int = 1,
+                 pretrained: bool = False,
+                 pretrained_path: str | None = None):
+        super().__init__()
+        self.inplanes = 64
+        self.conv1   = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1     = nn.BatchNorm2d(64)
+        self.relu    = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1  = self._make_layer(BasicBlock, 64, 2)
+        self.layer2  = self._make_layer(BasicBlock, 128, 2, stride=2)
+        self.layer3  = self._make_layer(BasicBlock, 256, 2, stride=2)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+        if pretrained and pretrained_path:
+            state_dict = torch.load(pretrained_path, map_location='cpu')
+            state_dict = _adapt_first_conv_weight(state_dict, in_channels)
+            self.load_state_dict(state_dict, strict=False)
+
+    def _make_layer(self, block: type, planes: int, blocks: int,
+                    stride: int = 1) -> nn.Sequential:
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                conv1x1(self.inplanes, planes * block.expansion, stride),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+        layer_list = [block(self.inplanes, planes, stride, downsample)]
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layer_list.append(block(self.inplanes, planes))
+        return nn.Sequential(*layer_list)
+
+    def forward(self, x: torch.Tensor):
+        c1 = self.relu(self.bn1(self.conv1(x)))
+        c2 = self.maxpool(c1)
+        c2 = self.layer1(c2)
+        c3 = self.layer2(c2)
+        c4 = self.layer3(c3)
+        return c3, c4

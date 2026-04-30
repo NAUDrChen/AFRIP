@@ -1,0 +1,56 @@
+detector:
+  type: YOLORTv2
+  num_classes: 3
+  conf_thresh: 0.01
+  nms_thresh: 0.5
+  nms_type: hard
+  soft_nms_method: linear
+  soft_nms_sigma: 0.5
+  soft_nms_score_thresh: 0.001
+  topk: null
+  trainable: false
+  deploy: false
+  backbone_cfg:
+    type: ResNet18Pyramid
+    in_channels: 1
+    pretrained: false
+    pretrained_path: null
+  neck_cfg:
+    type: SPPF
+    in_dim: 256
+    out_dim: 512
+    expand_ratio: 0.5
+    pooling_size: 5
+    act_type: lrelu
+    norm_type: BN
+  head_cfg:
+    type: DecoupledHead
+    num_cls_head: 2
+    num_reg_head: 2
+    act_type: lrelu
+    norm_type: BN
+    depthwise: false
+
+loss:
+  type: YoloRTv2Criterion
+  num_classes: 3
+  loss_obj_weight: 1.0
+  loss_box_weight: 5.0
+  loss_obj_empty_factor: 0.25
+  assigner: simota
+  assign_radius: 1
+  assign_use_inbox: false
+  assign_area_weight: 0.05
+  assign_force_one: true
+  assign_force_max_radius: 6
+  assign_force_level: 0
+  matcher_cfg:
+    type: SimOTAMatcher
+    topk: 10
+    center_radius: 2.5
+    iou_weight: 3.0
+    cls_weight: 1.0
+    use_inbox: true
+    use_center: true
+    force_one: true
+    force_level: 0
