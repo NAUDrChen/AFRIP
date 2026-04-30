@@ -9,10 +9,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from afrip.core import BaseDataset, BaseDetector
 from afrip.datasets import build_dataset, build_transform_pipeline
-from afrip.datasets.loaders.radar_window_dataset import RadarWindowDataset
 from afrip.models import build_detector, build_loss
-from afrip.utils.solver import build_yolo_optimizer, build_lr_scheduler
+from afrip.strategies import build_optimizer, build_scheduler
 
 # 顶层全局：供 DataLoader worker 初始化函数访问
 _WORKER_BASE_SEED: int | None = None
@@ -41,7 +41,7 @@ class Trainer:
         cfg: 由 ``load_config`` 合并后的配置字典，期望包含以下顶层键：
 
             - ``runtime``          设备、种子、最大 epoch、日志频率
-            - ``detector``         探测器配置（同时含 trainable、conf_thresh 等）
+            - ``detector``         探测器配置
             - ``loss``             损失函数配置
             - ``dataset``          数据集配置
             - ``dataloader``       DataLoader 参数（batch_size、num_workers、shuffle）
@@ -80,6 +80,8 @@ class Trainer:
         # ── 模型 ─────────────────────────────────────────────
         det_cfg = {**cfg["detector"], "trainable": True}
         self.model = build_detector(det_cfg).to(self.device)
+        if isinstance(self.model, BaseDetector):
+            self.model.set_training_behavior(True)
 
         # ── 损失函数 ─────────────────────────────────────────
         loss_cfg = dict(cfg["loss"])
@@ -90,13 +92,13 @@ class Trainer:
         # ── 优化器 ───────────────────────────────────────────
         optim_cfg = strat.get("optimizer", {})
         resume    = eval_cfg.get("resume", None)
-        self.optimizer, self.start_epoch = build_yolo_optimizer(
+        self.optimizer, self.start_epoch = build_optimizer(
             optim_cfg, self.model, resume
         )
 
         # ── 学习率调度器 ──────────────────────────────────────
         sched_cfg = strat.get("scheduler", {})
-        self.lr_scheduler, self.lf = build_lr_scheduler(
+        self.lr_scheduler, self.lf = build_scheduler(
             sched_cfg, self.optimizer, self.max_epoch
         )
         self.lr_scheduler.last_epoch = self.start_epoch - 1
@@ -131,6 +133,9 @@ class Trainer:
             transforms=val_pipeline,
         )
 
+        train_collate_fn = self._resolve_collate_fn(train_ds)
+        val_collate_fn = self._resolve_collate_fn(val_ds)
+
         # 可重现性
         global _WORKER_BASE_SEED
         g               = None
@@ -153,7 +158,7 @@ class Trainer:
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=num_workers_train,
-            collate_fn=RadarWindowDataset.collate_fn,
+            collate_fn=train_collate_fn,
             pin_memory=True,
             persistent_workers=persistent and num_workers_train > 0,
             generator=g,
@@ -164,7 +169,7 @@ class Trainer:
             batch_size=1,
             shuffle=False,
             num_workers=train_cfg.get("num_workers_test", 0),
-            collate_fn=RadarWindowDataset.collate_fn,
+            collate_fn=val_collate_fn,
             pin_memory=True,
         )
         return train_loader, val_loader
@@ -174,8 +179,8 @@ class Trainer:
     def train_one_epoch(self, epoch: int) -> None:
         """执行一个 epoch 的训练，含 warmup 学习率线性插值。"""
         self.model.train()
-        if hasattr(self.model, "trainable"):
-            self.model.trainable = True
+        if isinstance(self.model, BaseDetector):
+            self.model.set_training_behavior(True)
 
         batch_size  = self.cfg.get("dataloader", {}).get("batch_size", 4)
         epoch_size  = len(self.train_loader)
@@ -274,3 +279,12 @@ class Trainer:
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         return best_map
+
+    @staticmethod
+    def _resolve_collate_fn(dataset: BaseDataset):
+        collate_fn = getattr(dataset, "collate_fn", None)
+        if collate_fn is None:
+            raise TypeError(
+                f"Dataset '{type(dataset).__name__}' must provide a collate_fn."
+            )
+        return collate_fn

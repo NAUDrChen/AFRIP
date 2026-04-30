@@ -25,8 +25,17 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 ## 4. 推荐扩展顺序
 
-1. 定义 `BaseDataset`、`BaseDetector`、`BaseTracker` 抽象接口
+1. 定义 `BaseDataset`、`BaseDetector`、`BaseTracker` 抽象接口（已完成首版）
 2. 增加 `builder` 与统一 `Runner`
 3. 引入 Hook 机制，支持日志、评估、保存、可视化
 4. 为典型雷达任务补齐数据协议与指标
 5. 逐步支持联合训练、多阶段流水线与在线推理
+
+## 5. 当前重构进展
+
+- `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
+- `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
+- `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
+- `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
+- 检测器训练/推理模式切换已从隐式 `trainable` 属性迁移到显式接口
+- `engine/runner.py` 已提供最小 `BaseRunner` / `DetectionRunner` 骨架，脚本入口已切换接入

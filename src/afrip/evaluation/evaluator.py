@@ -6,6 +6,7 @@ import os
 import numpy as np
 import torch
 
+from afrip.core import BaseDetector
 from afrip.evaluation.map_metrics import MAPCalculator
 from afrip.evaluation.visualize import visualize_full_predictions, plot_roc_curve
 
@@ -41,7 +42,7 @@ class Evaluator:
         """在 test_loader 上推理，计算指标，可选保存最优权重。
 
         Args:
-            model:       检测模型（实现 ``trainable`` 属性）。
+            model:       检测模型。
             test_loader: 验证集 DataLoader（batch_size=1，full_frame）。
             device:      推理设备。
             epoch:       当前 epoch（0-indexed）。
@@ -51,9 +52,10 @@ class Evaluator:
             更新后的 best_map。
         """
         model.eval()
-        prev_trainable = getattr(model, "trainable", True)
-        if hasattr(model, "trainable"):
-            model.trainable = False
+        prev_training_behavior = None
+        if isinstance(model, BaseDetector):
+            prev_training_behavior = model.training_behavior_enabled
+            model.set_training_behavior(False)
 
         # ── 统计容器 ─────────────────────────────────────────
         ground_truth_data:    dict[str, list[dict]]  = {}
@@ -197,8 +199,8 @@ class Evaluator:
             print(f"[Eval] mAP={ap:.4f}, PD={pd:.4f}, PFA={pfa:.6f}")
 
         # ── 恢复模型训练状态 ──────────────────────────────────
-        if hasattr(model, "trainable"):
-            model.trainable = prev_trainable
+        if isinstance(model, BaseDetector) and prev_training_behavior is not None:
+            model.set_training_behavior(prev_training_behavior)
         model.train()
 
         # ── 可视化 ────────────────────────────────────────────

@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from afrip.core import BaseDetector
 from afrip.models.registry import (
     DETECTORS, BACKBONES, NECKS, HEADS,
     build_backbone, build_neck, build_head,
@@ -13,7 +14,7 @@ from afrip.utils.nms import multiclass_nms
 
 
 @DETECTORS.register("YOLORTv1")
-class YOLORTv1(nn.Module):
+class YOLORTv1(BaseDetector):
     """YOLORTv1 探测器。
 
     Args:
@@ -46,8 +47,8 @@ class YOLORTv1(nn.Module):
         self.stride      = stride
         self.conf_thresh = conf_thresh
         self.nms_thresh  = nms_thresh
-        self.trainable   = trainable
         self.deploy      = deploy
+        self.set_training_behavior(trainable)
 
         # ── 组件构建 ─────────────────────────────────────────
         self.backbone = build_backbone(backbone_cfg)
@@ -180,7 +181,7 @@ class YOLORTv1(nn.Module):
         return self.postprocess(bboxes, obj_scores)
 
     def forward(self, x: torch.Tensor):
-        if not self.trainable:
+        if not self.training_behavior_enabled:
             return self.inference(x)
 
         feat = self.backbone(x)

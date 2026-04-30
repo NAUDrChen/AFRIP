@@ -9,8 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
 
+from afrip.core import BaseDataset
 from afrip.datasets.registry import DATASETS
 
 try:
@@ -111,7 +111,7 @@ def boxes_csv_reader(csv_path: str) -> List[Dict[str, Any]]:
     return items
 
 @DATASETS.register("RadarWindowDataset")
-class RadarWindowDataset(Dataset):
+class RadarWindowDataset(BaseDataset):
     """
     将每个 mat 的 data_raw 按窗口切片。
     复数处理模式:

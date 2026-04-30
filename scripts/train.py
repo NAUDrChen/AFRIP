@@ -10,9 +10,8 @@ from typing import Any
 import numpy as np
 import torch
 
+from afrip.engine import DetectionRunner
 from afrip.utils import load_config
-from afrip.engine import Trainer
-from afrip.evaluation import Evaluator
 
 
 # ─────────────────────────────── CLI ────────────────────────────────
@@ -120,9 +119,8 @@ def main() -> int:
     apply_seed(cfg)
     print_summary(cfg)
 
-    trainer   = Trainer(cfg)
-    evaluator = Evaluator(cfg)
-    best_map  = trainer.run(evaluator=evaluator)
+    runner = DetectionRunner(cfg)
+    best_map = runner.run()
 
     print(f"\nTraining finished. Best mAP: {best_map:.4f}")
     return 0
