@@ -6,6 +6,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from afrip.models.detectors.dense_base import DenseDetectionOutputs, normalize_dense_outputs
 from afrip.models.registry import LOSSES, MATCHERS, build_matcher
 from afrip.models.matchers.yolo_matcher import YoloMatcher
 from afrip.utils.box_ops import get_ious
@@ -56,7 +57,7 @@ class YoloRTCriterion:
 
     def __call__(
         self,
-        outputs: dict[str, Any],
+        outputs: DenseDetectionOutputs | dict[str, Any],
         targets: list[dict],
         epoch: int = 0,
     ) -> dict[str, torch.Tensor]:
@@ -71,6 +72,7 @@ class YoloRTCriterion:
         Returns:
             dict 包含 ``loss_obj``、``loss_box``、``losses``、``empty_frame``。
         """
+        outputs = normalize_dense_outputs(outputs)
         device   = outputs['pred_obj'].device
         stride   = outputs['stride']
         fmp_size = outputs['fmp_size']

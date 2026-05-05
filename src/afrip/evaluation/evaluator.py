@@ -31,6 +31,25 @@ class Evaluator:
         self.vis_full     = cfg.get("strategy", {}).get("vis_pred_full", False)
 
     @torch.no_grad()
+    def evaluate_with_details(
+        self,
+        model: torch.nn.Module,
+        test_loader,
+        device: torch.device,
+        epoch: int = 0,
+        best_map: float = float("-inf"),
+        save_best: bool = False,
+    ) -> dict:
+        return self._evaluate_impl(
+            model=model,
+            test_loader=test_loader,
+            device=device,
+            epoch=epoch,
+            best_map=best_map,
+            save_best=save_best,
+        )
+
+    @torch.no_grad()
     def evaluate(
         self,
         model: torch.nn.Module,
@@ -51,6 +70,26 @@ class Evaluator:
         Returns:
             更新后的 best_map。
         """
+        details = self._evaluate_impl(
+            model=model,
+            test_loader=test_loader,
+            device=device,
+            epoch=epoch,
+            best_map=best_map,
+            save_best=True,
+        )
+        return float(details["best_map"])
+
+    @torch.no_grad()
+    def _evaluate_impl(
+        self,
+        model: torch.nn.Module,
+        test_loader,
+        device: torch.device,
+        epoch: int,
+        best_map: float,
+        save_best: bool,
+    ) -> dict:
         model.eval()
         prev_training_behavior = None
         if isinstance(model, BaseDetector):
@@ -186,7 +225,7 @@ class Evaluator:
         pfa = float(total_fp / max(total_non_target_cells, 1))
 
         # ── 保存最优权重 ──────────────────────────────────────
-        if ap > best_map:
+        if save_best and ap > best_map:
             os.makedirs(self.save_folder, exist_ok=True)
             save_path = os.path.join(
                 self.save_folder,
@@ -226,4 +265,16 @@ class Evaluator:
             except Exception as e:
                 print(f"[Eval] 可视化失败: {e}")
 
-        return best_map
+        return {
+            "best_map": best_map,
+            "mAP": ap,
+            "pd": pd,
+            "pfa": pfa,
+            "total_gt": total_gt,
+            "total_tp": total_tp,
+            "total_fp": total_fp,
+            "total_non_target_cells": total_non_target_cells,
+            "class_names_seen": sorted(class_names_seen),
+            "default_class": default_class,
+            "map_res": map_res,
+        }

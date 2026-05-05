@@ -6,11 +6,11 @@ import torch
 import torch.nn as nn
 
 from afrip.core import BaseDetector
+from afrip.modules import build_postprocessor, build_preprocessor
 from afrip.models.registry import (
     DETECTORS, BACKBONES, NECKS, HEADS,
     build_backbone, build_neck, build_head,
 )
-from afrip.utils.nms import multiclass_nms
 
 
 @DETECTORS.register("YOLORTv1")
@@ -39,6 +39,8 @@ class YOLORTv1(BaseDetector):
         stride: int = 16,
         conf_thresh: float = 0.01,
         nms_thresh: float = 0.5,
+        preprocessor_cfg: dict | None = None,
+        postprocessor_cfg: dict | None = None,
         trainable: bool = False,
         deploy: bool = False,
     ):
@@ -49,6 +51,20 @@ class YOLORTv1(BaseDetector):
         self.nms_thresh  = nms_thresh
         self.deploy      = deploy
         self.set_training_behavior(trainable)
+
+        if preprocessor_cfg is None:
+            preprocessor_cfg = {"type": "TensorPreprocessor"}
+        self.preprocessor = build_preprocessor(preprocessor_cfg)
+
+        if postprocessor_cfg is None:
+            postprocessor_cfg = {
+                "type": "YOLOObjectnessPostprocessor",
+                "conf_thresh": conf_thresh,
+                "nms_thresh": nms_thresh,
+                "class_agnostic": True,
+                "num_classes": 1,
+            }
+        self.postprocessor = build_postprocessor(postprocessor_cfg)
 
         # ── 组件构建 ─────────────────────────────────────────
         self.backbone = build_backbone(backbone_cfg)
@@ -120,42 +136,13 @@ class YOLORTv1(BaseDetector):
         pred_box[~torch.isfinite(pred_box)] = 0.0
         return pred_box
 
-    def postprocess(
-        self,
-        bboxes: np.ndarray,
-        obj_scores: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """阈值过滤 + class-agnostic NMS。
-
-        Returns:
-            (bboxes, scores, labels) after NMS.
-        """
-        keep        = np.where(obj_scores >= self.conf_thresh)[0]
-        bboxes      = bboxes[keep]
-        scores      = obj_scores[keep]
-        labels      = np.zeros(len(scores), dtype=np.int32)
-
-        if len(bboxes) == 0:
-            return bboxes, scores, labels
-
-        finite  = np.isfinite(bboxes).all(axis=1)
-        proper  = (bboxes[:, 2] > bboxes[:, 0]) & (bboxes[:, 3] > bboxes[:, 1])
-        mask    = finite & proper
-        bboxes  = bboxes[mask]
-        scores  = scores[mask]
-        labels  = labels[mask]
-
-        scores, labels, bboxes = multiclass_nms(
-            scores, labels, bboxes, self.nms_thresh, 1, class_agnostic=True
-        )
-        return bboxes, scores, labels
-
     # ─────────────────────────── 推理 / 训练 ───────────────────────────
 
     @torch.no_grad()
     def inference(
         self, x: torch.Tensor
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | torch.Tensor:
+        x = self.preprocessor(x)
         feat = self.backbone(x)
         feat = self.neck(feat)
         cls_feat, reg_feat = self.head(feat)
@@ -178,12 +165,13 @@ class YOLORTv1(BaseDetector):
 
         bboxes     = bboxes.cpu().numpy()
         obj_scores = obj_scores.cpu().numpy()
-        return self.postprocess(bboxes, obj_scores)
+        return self.postprocessor(bboxes, obj_scores)
 
     def forward(self, x: torch.Tensor):
         if not self.training_behavior_enabled:
             return self.inference(x)
 
+        x = self.preprocessor(x)
         feat = self.backbone(x)
         feat = self.neck(feat)
         cls_feat, reg_feat = self.head(feat)

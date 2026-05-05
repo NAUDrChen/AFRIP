@@ -12,43 +12,86 @@ import math
 from afrip.datasets.loaders.radar_window_dataset import RadarWindowDataset
 import cv2
 
+def compute_roc_points(pr_curve: Dict[str, Any],
+                                             total_gt: int,
+                                             total_non_target_cells: int) -> Tuple[np.ndarray, np.ndarray]:
+        """由 PR 曲线恢复 ROC 曲线点。
+
+        返回:
+            - fpr: False Positive Rate
+            - tpr: True Positive Rate
+        """
+        rec = np.array(pr_curve.get("rec", []), dtype=float)
+        prec = np.array(pr_curve.get("prec", []), dtype=float)
+        if rec.size == 0 or prec.size == 0:
+                return np.array([], dtype=float), np.array([], dtype=float)
+
+        safe_prec = np.clip(prec, 1e-12, 1.0)
+        safe_total_non_target = max(int(total_non_target_cells), 1)
+        safe_total_gt = max(int(total_gt), 1)
+
+        fp = (1.0 / safe_prec - 1.0) * rec * safe_total_gt
+        fpr = fp / safe_total_non_target
+        tpr = rec
+        return fpr, tpr
+
+
 def plot_roc_curve(pr_curve: Dict[str, Any],
-                   total_gt: int,
-                   total_non_target_cells: int,
-                   epoch: int,
-                   save_dir: str = "results"):
+                                     total_gt: int,
+                                     total_non_target_cells: int,
+                                     epoch: int,
+                                     save_dir: str = "results",
+                                     label: str = "ROC",
+                                     ax=None,
+                                     save_path: Optional[str] = None):
     """
     基于 PR 曲线数据绘制 ROC：
       - TPR = recall
       - FPR 由 precision/recall 反推 FP，再除以非目标单元数
     文件命名按轮次：roc_epoch_{epoch+1:03d}.png
     """
-    import numpy as np
     import os
     import matplotlib.pyplot as plt
 
-    rec = np.array(pr_curve.get("rec", []), dtype=float)
-    prec = np.array(pr_curve.get("prec", []), dtype=float)
-    if rec.size == 0 or prec.size == 0:
-        return
+    fpr, tpr = compute_roc_points(pr_curve, total_gt, total_non_target_cells)
+    if fpr.size == 0 or tpr.size == 0:
+        return {
+            "fpr": fpr,
+            "tpr": tpr,
+            "out_path": None,
+        }
 
-    fpr=np.multiply(np.divide(1,prec)-1,np.dot(rec,total_gt))/total_non_target_cells
-    tpr = rec
+    created_fig = False
+    if ax is None:
+        created_fig = True
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
 
-    os.makedirs(save_dir, exist_ok=True)
-    out_path = os.path.join(save_dir, f"roc_epoch_{epoch+1:03d}.png")
+    ax.semilogx(fpr, tpr, label=label)
+    existing_labels = set(ax.get_legend_handles_labels()[1])
+    if "Chance" not in existing_labels:
+        ax.plot([1e-6, 1], [0, 1], "k--", alpha=0.4, label="Chance")
+    ax.set_xlabel("FPR")
+    ax.set_ylabel("TPR")
+    ax.set_title(f"ROC Curve (epoch {epoch+1})")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
 
-    plt.figure()
-    plt.semilogx(fpr, tpr, label="ROC")
-    plt.plot([0, 1], [0, 1], "k--", alpha=0.4, label="Chance")
-    plt.xlabel("FPR")
-    plt.ylabel("TPR")
-    plt.title(f"ROC Curve (epoch {epoch+1})")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=150)
-    plt.close()
+    out_path = save_path
+    if created_fig:
+        if out_path is None:
+            os.makedirs(save_dir, exist_ok=True)
+            out_path = os.path.join(save_dir, f"roc_epoch_{epoch+1:03d}.png")
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=150)
+        plt.close(fig)
+
+    return {
+        "fpr": fpr,
+        "tpr": tpr,
+        "out_path": out_path,
+    }
 
 def visualize_full_predictions(dataset: RadarWindowDataset,
                                records: List[Dict[str, Any]],

@@ -3,7 +3,7 @@ dataset:
   mat_dir: G:\Data\data
   csv_path: G:\Data\data\data_mat.csv
   window_size: [640, 640]
-  stride: [640, 640]
+  stride: [320, 320]
   complex_mode: abs
   subset: train
   azimuth_split_ratio: 0.7
@@ -15,7 +15,7 @@ dataset:
     uk: 2
 
 dataloader:
-  batch_size: 4
+  batch_size: 16
   num_workers: 4
   shuffle: false
 

@@ -6,6 +6,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from afrip.models.detectors.dense_base import DenseDetectionOutputs, normalize_dense_outputs
 from afrip.models.registry import LOSSES, build_matcher
 
 
@@ -196,7 +197,8 @@ class YoloRTv2Criterion:
             gt_box[pos] = gt_boxes_xyxy[assigned_gt[pos]]
         return gt_obj, gt_box
 
-    def __call__(self, outputs: dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, torch.Tensor]:
+    def __call__(self, outputs: DenseDetectionOutputs | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, torch.Tensor]:
+        outputs = normalize_dense_outputs(outputs)
         pred_obj = outputs["pred_obj"]
         pred_box = outputs["pred_box"]
         batch_size, num_points, _ = pred_obj.shape

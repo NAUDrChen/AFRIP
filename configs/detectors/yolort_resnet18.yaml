@@ -4,6 +4,14 @@ detector:
   stride: 16
   conf_thresh: 0.01
   nms_thresh: 0.5
+  preprocessor_cfg:
+    type: TensorPreprocessor
+  postprocessor_cfg:
+    type: YOLOObjectnessPostprocessor
+    conf_thresh: 0.01
+    nms_thresh: 0.5
+    class_agnostic: true
+    num_classes: 1
   trainable: false
   deploy: false
   backbone_cfg:

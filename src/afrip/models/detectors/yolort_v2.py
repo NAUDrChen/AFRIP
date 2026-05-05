@@ -7,9 +7,9 @@ import torch.nn.functional as F
 from torch import nn
 
 from afrip.core import BaseDetector
+from afrip.modules import build_postprocessor, build_preprocessor
 from afrip.models.common import Conv
 from afrip.models.registry import DETECTORS, build_backbone, build_head, build_neck
-from afrip.utils.nms import multiclass_nms
 
 
 @DETECTORS.register("YOLORTv2")
@@ -29,6 +29,8 @@ class YOLORTv2(BaseDetector):
         soft_nms_sigma: float = 0.5,
         soft_nms_score_thresh: float = 1e-3,
         topk: int | None = None,
+        preprocessor_cfg: dict | None = None,
+        postprocessor_cfg: dict | None = None,
         trainable: bool = False,
         deploy: bool = False,
     ):
@@ -44,6 +46,25 @@ class YOLORTv2(BaseDetector):
         self.strides = [8, 16]
         self.deploy = deploy
         self.set_training_behavior(trainable)
+
+        if preprocessor_cfg is None:
+            preprocessor_cfg = {"type": "TensorPreprocessor"}
+        self.preprocessor = build_preprocessor(preprocessor_cfg)
+
+        if postprocessor_cfg is None:
+            postprocessor_cfg = {
+                "type": "YOLOObjectnessPostprocessor",
+                "conf_thresh": conf_thresh,
+                "nms_thresh": nms_thresh,
+                "nms_type": nms_type,
+                "soft_nms_method": soft_nms_method,
+                "soft_nms_sigma": soft_nms_sigma,
+                "soft_nms_score_thresh": soft_nms_score_thresh,
+                "topk": topk,
+                "class_agnostic": True,
+                "num_classes": 1,
+            }
+        self.postprocessor = build_postprocessor(postprocessor_cfg)
 
         self.backbone = build_backbone(backbone_cfg)
         self.neck = build_neck(neck_cfg)
@@ -64,15 +85,18 @@ class YOLORTv2(BaseDetector):
         init_prob = 0.01
         bias_value = -torch.log(torch.tensor((1.0 - init_prob) / init_prob))
         for obj_layer in (self.obj_pred_p2, self.obj_pred_p3):
+            assert obj_layer.bias is not None
             bias = obj_layer.bias.view(1, -1)
             bias.data.fill_(bias_value.item())
             obj_layer.bias = nn.Parameter(bias.view(-1), requires_grad=True)
 
+        assert self.cls_pred.bias is not None
         bias = self.cls_pred.bias.view(1, -1)
         bias.data.fill_(bias_value.item())
         self.cls_pred.bias = nn.Parameter(bias.view(-1), requires_grad=True)
 
         for reg_layer in (self.reg_pred_p2, self.reg_pred_p3):
+            assert reg_layer.bias is not None
             bias = reg_layer.bias.view(-1)
             bias.data.fill_(1.0)
             reg_layer.bias = nn.Parameter(bias.view(-1), requires_grad=True)
@@ -91,34 +115,6 @@ class YOLORTv2(BaseDetector):
         pred_box = torch.cat([pred_ctr - pred_wh * 0.5, pred_ctr + pred_wh * 0.5], dim=-1)
         pred_box[~torch.isfinite(pred_box)] = 0.0
         return pred_box
-
-    def postprocess(self, bboxes: np.ndarray, obj_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        keep = np.where(obj_scores >= self.conf_thresh)[0]
-        bboxes = bboxes[keep]
-        scores = obj_scores[keep]
-        labels = np.zeros(len(scores), dtype=np.int32)
-
-        finite = np.isfinite(bboxes).all(axis=1) if len(bboxes) else np.zeros((0,), dtype=bool)
-        proper = (bboxes[:, 2] > bboxes[:, 0]) & (bboxes[:, 3] > bboxes[:, 1]) & (bboxes[:, 1] > 0) if len(bboxes) else np.zeros((0,), dtype=bool)
-        mask = finite & proper
-        bboxes = bboxes[mask]
-        scores = scores[mask]
-        labels = labels[mask]
-
-        scores, labels, bboxes = multiclass_nms(
-            scores,
-            labels,
-            bboxes,
-            self.nms_thresh,
-            1,
-            True,
-            nms_type=self.nms_type,
-            soft_nms_method=self.soft_nms_method,
-            soft_nms_sigma=self.soft_nms_sigma,
-            soft_nms_score_thresh=self.soft_nms_score_thresh,
-            topk=self.topk,
-        )
-        return bboxes, scores, labels
 
     def _forward_features(self, x: torch.Tensor):
         c3, c4 = self.backbone(x)
@@ -139,6 +135,7 @@ class YOLORTv2(BaseDetector):
 
     @torch.no_grad()
     def inference(self, x: torch.Tensor):
+        x = self.preprocessor(x)
         (obj_p2, reg_p2, fmp2_size), (obj_p3, reg_p3, fmp3_size) = self._forward_features(x)
         obj_p2 = obj_p2.permute(0, 2, 3, 1).contiguous().flatten(1, 2)
         reg_p2 = reg_p2.permute(0, 2, 3, 1).contiguous().flatten(1, 2)
@@ -155,13 +152,14 @@ class YOLORTv2(BaseDetector):
         if self.deploy:
             return torch.cat([box_all, obj_scores[:, None]], dim=-1)
 
-        bboxes, scores, labels = self.postprocess(box_all.cpu().numpy(), obj_scores.cpu().numpy())
+        bboxes, scores, labels = self.postprocessor(box_all.cpu().numpy(), obj_scores.cpu().numpy())
         return bboxes, scores, labels
 
     def forward(self, x: torch.Tensor):
         if not self.training_behavior_enabled:
             return self.inference(x)
 
+        x = self.preprocessor(x)
         (obj_p2, reg_p2, fmp2_size), (obj_p3, reg_p3, fmp3_size) = self._forward_features(x)
         obj_p2 = obj_p2.permute(0, 2, 3, 1).contiguous().flatten(1, 2)
         reg_p2 = reg_p2.permute(0, 2, 3, 1).contiguous().flatten(1, 2)
