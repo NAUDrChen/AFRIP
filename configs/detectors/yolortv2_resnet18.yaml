@@ -1,5 +1,6 @@
 detector:
-  type: YOLORTv2
+  type: UnifiedDenseDetector
+  architecture: yolort_v2
   num_classes: 3
   conf_thresh: 0.01
   nms_thresh: 0.5

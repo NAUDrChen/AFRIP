@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from afrip.core import BaseDataset, BaseDetector
 from afrip.datasets import build_dataset, build_transform_pipeline
-from afrip.models import build_detector, build_loss
+from afrip.models import assemble_detection_components
 from afrip.strategies import build_optimizer, build_scheduler
 
 # 顶层全局：供 DataLoader worker 初始化函数访问
@@ -77,17 +77,14 @@ class Trainer:
         # ── 混合精度 scaler ───────────────────────────────────
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
 
-        # ── 模型 ─────────────────────────────────────────────
-        det_cfg = {**cfg["detector"], "trainable": True}
-        self.model = build_detector(det_cfg).to(self.device)
+        # ── 模型装配 ─────────────────────────────────────────
+        self.model, self.criterion = assemble_detection_components(
+            cfg,
+            trainable=True,
+        )
+        self.model = self.model.to(self.device)
         if isinstance(self.model, BaseDetector):
             self.model.set_training_behavior(True)
-
-        # ── 损失函数 ─────────────────────────────────────────
-        loss_cfg = dict(cfg["loss"])
-        if "num_classes" not in loss_cfg:
-            loss_cfg["num_classes"] = cfg["detector"].get("num_classes", 1)
-        self.criterion = build_loss(loss_cfg)
 
         # ── 优化器 ───────────────────────────────────────────
         optim_cfg = strat.get("optimizer", {})

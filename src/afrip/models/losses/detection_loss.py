@@ -60,7 +60,7 @@ class YoloRTCriterion:
         outputs: DenseDetectionOutputs | dict[str, Any],
         targets: list[dict],
         epoch: int = 0,
-    ) -> dict[str, torch.Tensor]:
+    ) -> dict[str, Any]:
         """计算总损失。
 
         Args:

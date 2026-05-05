@@ -197,7 +197,7 @@ class YoloRTv2Criterion:
             gt_box[pos] = gt_boxes_xyxy[assigned_gt[pos]]
         return gt_obj, gt_box
 
-    def __call__(self, outputs: DenseDetectionOutputs | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, torch.Tensor]:
+    def __call__(self, outputs: DenseDetectionOutputs | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, Any]:
         outputs = normalize_dense_outputs(outputs)
         pred_obj = outputs["pred_obj"]
         pred_box = outputs["pred_box"]

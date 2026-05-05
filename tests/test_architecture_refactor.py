@@ -4,6 +4,7 @@ import torch
 
 from afrip.core import BaseDataset, BaseDetector
 from afrip.engine import DetectionRunner
+from afrip.models import normalize_detector_config
 from afrip.strategies import build_optimizer, build_scheduler
 
 
@@ -30,10 +31,17 @@ def test_radar_window_dataset_is_base_dataset() -> None:
     assert issubclass(RadarWindowDataset, BaseDataset)
 
 
-def test_yolort_is_base_detector() -> None:
-    from afrip.models.detectors.yolort import YOLORTv1
+def test_unified_dense_detector_is_base_detector() -> None:
+    from afrip.models.detectors.assembly import UnifiedDenseDetector
 
-    assert issubclass(YOLORTv1, BaseDetector)
+    assert issubclass(UnifiedDenseDetector, BaseDetector)
+
+
+def test_legacy_detector_types_normalize_to_unified_assembly() -> None:
+    normalized = normalize_detector_config({"type": "YOLORTv2", "num_classes": 3})
+
+    assert normalized["type"] == "UnifiedDenseDetector"
+    assert normalized["architecture"] == "yolort_v2"
 
 
 def test_strategies_exports_builders() -> None:
