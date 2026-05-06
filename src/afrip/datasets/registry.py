@@ -12,10 +12,10 @@ class Compose:
     def __init__(self, transforms: list[Any]) -> None:
         self.transforms = transforms
 
-    def __call__(self, image, raw_boxes):
+    def __call__(self, image, boxes):
         for transform in self.transforms:
-            image, raw_boxes = transform(image, raw_boxes)
-        return image, raw_boxes
+            image, boxes = transform(image, boxes)
+        return image, boxes
 
 
 def build_transform_pipeline(configs: list[dict[str, Any]] | None) -> Any:

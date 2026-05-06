@@ -9,8 +9,6 @@ import torch.nn.functional as F
 
 from afrip.core import BaseDetector
 from afrip.modules import build_postprocessor, build_preprocessor
-
-from .contracts import DetectionDetections, DetectionModelOutput
 from .registry import (
     DETECTORS,
     build_backbone,
@@ -44,8 +42,8 @@ class ConfigurableDetectionModel(BaseDetector):
     - backbone: returns Tensor or sequence[Tensor]
     - feature_nodes: each node consumes named tensors or backbone outputs
     - head: returns (cls_feat, reg_feat)
-    - training forward returns DetectionModelOutput
-    - inference returns DetectionDetections
+    - training forward returns plain output dict
+    - inference returns plain detection dict
     """
 
     def __init__(
@@ -217,7 +215,7 @@ class ConfigurableDetectionModel(BaseDetector):
         pred_box[~torch.isfinite(pred_box)] = 0.0
         return pred_box
 
-    def _run_dense_model(self, x: torch.Tensor) -> DetectionModelOutput:
+    def _run_dense_model(self, x: torch.Tensor) -> dict[str, Any]:
         x = self.preprocessor(x)
         features = self._build_feature_map(x)
         pred_obj_levels = []
@@ -244,33 +242,29 @@ class ConfigurableDetectionModel(BaseDetector):
             strides.append(stride)
             feature_shapes.append(fmp_size)
 
-        return DetectionModelOutput(
-            pred_obj=torch.cat(pred_obj_levels, dim=1),
-            pred_box=torch.cat(pred_box_levels, dim=1),
-            strides=strides,
-            feature_shapes=feature_shapes,
-        )
+        pred_obj = torch.cat(pred_obj_levels, dim=1)
+        pred_box = torch.cat(pred_box_levels, dim=1)
+        return {
+            "pred_obj": pred_obj,
+            "pred_box": pred_box,
+            "strides_all": strides,
+            "fmp_sizes_all": feature_shapes,
+            "stride": int(strides[-1]),
+            "fmp_size": tuple(feature_shapes[-1]),
+        }
 
     @torch.no_grad()
-    def inference(self, x: torch.Tensor) -> DetectionDetections | torch.Tensor:
+    def inference(self, x: torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
         outputs = self._run_dense_model(x)
-        if outputs.pred_obj.shape[0] != 1:
+        if outputs["pred_obj"].shape[0] != 1:
             raise ValueError("ConfigurableDetectionModel inference expects batch size 1")
 
-        boxes = outputs.pred_box[0]
-        scores = outputs.pred_obj[0].squeeze(-1).sigmoid()
+        boxes = outputs["pred_box"][0]
+        scores = outputs["pred_obj"][0].squeeze(-1).sigmoid()
         if self.deploy:
             return torch.cat([boxes, scores[:, None]], dim=-1)
 
-        det_boxes, det_scores, det_labels = self.postprocessor(
-            boxes.detach().cpu().numpy(),
-            scores.detach().cpu().numpy(),
-        )
-        return DetectionDetections(
-            boxes=torch.from_numpy(det_boxes).float(),
-            scores=torch.from_numpy(det_scores).float(),
-            labels=torch.from_numpy(det_labels).long(),
-        )
+        return self.postprocessor(boxes, scores)
 
     def forward(self, x: torch.Tensor):
         if self.training_behavior_enabled:

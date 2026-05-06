@@ -1,6 +1,24 @@
 from __future__ import annotations
 
 import numpy as np
+import torch
+
+
+def _to_numpy(array):
+    if isinstance(array, torch.Tensor):
+        return array.detach().cpu().numpy()
+    return array
+
+
+def _restore_type(reference, scores, labels, bboxes):
+    if isinstance(reference, torch.Tensor):
+        device = reference.device
+        return (
+            torch.from_numpy(scores).to(device=device, dtype=reference.dtype),
+            torch.from_numpy(labels).to(device=device, dtype=torch.long),
+            torch.from_numpy(bboxes).to(device=device, dtype=reference.dtype),
+        )
+    return scores, labels, bboxes
 
 
 def nms(bboxes: np.ndarray, scores: np.ndarray, nms_thresh: float) -> list[int]:
@@ -101,9 +119,9 @@ def soft_nms(
 
 
 def multiclass_nms(
-    scores: np.ndarray,
-    labels: np.ndarray,
-    bboxes: np.ndarray,
+    scores: np.ndarray | torch.Tensor,
+    labels: np.ndarray | torch.Tensor,
+    bboxes: np.ndarray | torch.Tensor,
     nms_thresh: float,
     num_classes: int,
     class_agnostic: bool = False,
@@ -112,8 +130,12 @@ def multiclass_nms(
     soft_nms_sigma: float = 0.5,
     soft_nms_score_thresh: float = 1e-3,
     topk: int | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]:
     """多类 NMS，返回 (scores, labels, bboxes) 过滤后的结果。"""
+    ref_scores = scores
+    scores = _to_numpy(scores)
+    labels = _to_numpy(labels)
+    bboxes = _to_numpy(bboxes)
     use_soft_nms = nms_type.lower() == "soft"
 
     if class_agnostic:
@@ -132,10 +154,13 @@ def multiclass_nms(
             if topk is not None:
                 keep = keep[:topk]
         if len(keep) == 0:
-            return (np.zeros((0,), dtype=scores.dtype),
-                    np.zeros((0,), dtype=labels.dtype),
-                    np.zeros((0, 4), dtype=bboxes.dtype))
-        return scores[keep], labels[keep], bboxes[keep]
+            return _restore_type(
+                ref_scores,
+                np.zeros((0,), dtype=scores.dtype),
+                np.zeros((0,), dtype=labels.dtype),
+                np.zeros((0, 4), dtype=bboxes.dtype),
+            )
+        return _restore_type(ref_scores, scores[keep], labels[keep], bboxes[keep])
 
     out_scores, out_labels, out_bboxes = [], [], []
     for i in range(num_classes):
@@ -163,9 +188,12 @@ def multiclass_nms(
         out_bboxes.append(bboxes[inds][c_keep])
 
     if not out_scores:
-        return (np.zeros((0,), dtype=scores.dtype),
-                np.zeros((0,), dtype=labels.dtype),
-                np.zeros((0, 4), dtype=bboxes.dtype))
+        return _restore_type(
+            ref_scores,
+            np.zeros((0,), dtype=scores.dtype),
+            np.zeros((0,), dtype=labels.dtype),
+            np.zeros((0, 4), dtype=bboxes.dtype),
+        )
 
     scores = np.concatenate(out_scores)
     labels = np.concatenate(out_labels)
@@ -173,4 +201,4 @@ def multiclass_nms(
     order = scores.argsort()[::-1]
     if topk is not None:
         order = order[:topk]
-    return scores[order], labels[order], bboxes[order]
+    return _restore_type(ref_scores, scores[order], labels[order], bboxes[order])

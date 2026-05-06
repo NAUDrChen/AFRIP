@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import math
 from typing import Tuple
-import numpy as np
 import torch
 
-from afrip.datasets.registry import TRANSFORMS
+from afrip.datasets.registry import Compose, TRANSFORMS
 
 @TRANSFORMS.register("AmplitudeNormalize")
 class AmplitudeNormalize:
@@ -20,49 +20,46 @@ class AmplitudeNormalize:
         self.clip_val = clip_val
         self.eps = eps
 
-    def __call__(self, image: torch.Tensor, raw_boxes: np.ndarray):
+    def __call__(self, image: torch.Tensor, boxes: torch.Tensor):
         # image: [C,H,W]
-        C, H, W = image.shape
-        img_np = image.cpu().numpy()
-        if C == 2:  # stack 或 magnitude_phase
-            # 假设通道0=real或幅度；尝试判断是否复栈: 用方差比简单区分
-            # 对 stack: 复数 => real/imag
-            real = img_np[0]
-            imag = img_np[1]
-            amp = np.sqrt(real**2 + imag**2)
-            phase = np.arctan2(imag, real)
+        image = image.float()
+        if image.shape[0] == 2:
+            real = image[0]
+            imag = image[1]
+            amp = torch.sqrt(real.square() + imag.square())
+            phase = torch.atan2(imag, real)
             is_stack = True
         else:
-            amp = np.abs(img_np[0])
+            amp = image[0].abs()
             phase = None
             is_stack = False
 
         if self.mode == "db_percentile":
-            db = 20.0 * np.log10(amp + self.eps)
-            p1, p99 = np.percentile(db, [1, 99])
-            norm = np.clip((db - p1) / (p99 - p1 + 1e-6), 0.0, 1.0)
+            db = 20.0 * torch.log10(amp + self.eps)
+            p1 = torch.quantile(db.reshape(-1), 0.01)
+            p99 = torch.quantile(db.reshape(-1), 0.99)
+            norm = ((db - p1) / (p99 - p1 + 1e-6)).clamp(0.0, 1.0)
         elif self.mode == "minmax":
-            a_min, a_max = float(amp.min()), float(amp.max())
+            a_min = amp.min()
+            a_max = amp.max()
             norm = (amp - a_min) / (a_max - a_min + 1e-6)
         elif self.mode == "standard":
-            mean = float(amp.mean())
-            std = float(amp.std() + 1e-6)
+            mean = amp.mean()
+            std = amp.std() + 1e-6
             z = (amp - mean) / std
-            z = np.clip(z, -self.clip_val, self.clip_val)
+            z = z.clamp(-self.clip_val, self.clip_val)
             norm = (z + self.clip_val) / (2 * self.clip_val)
         else:
             raise ValueError(f"未知归一化模式: {self.mode}")
 
         if is_stack:
-            # 保持相位: real_norm = cos(phase)*norm, imag_norm = sin(phase)*norm
-            real_new = np.cos(phase) * norm
-            imag_new = np.sin(phase) * norm
-            out = np.stack([real_new, imag_new], axis=0).astype(np.float32)
+            real_new = torch.cos(phase) * norm
+            imag_new = torch.sin(phase) * norm
+            image = torch.stack([real_new, imag_new], dim=0)
         else:
-            out = norm[None, ...].astype(np.float32)
+            image = norm.unsqueeze(0)
 
-        image = torch.from_numpy(out)
-        return image, raw_boxes
+        return image.to(dtype=torch.float32), boxes
     
 @TRANSFORMS.register("RandomVerticalFlip")
 class RandomVerticalFlip:
@@ -70,19 +67,18 @@ class RandomVerticalFlip:
     def __init__(self, prob: float = 0.5):
         self.prob = prob
 
-    def __call__(self, image: torch.Tensor, raw_boxes: np.ndarray):
-        if np.random.rand() >= self.prob:
-            return image, raw_boxes
-        C, H, W = image.shape
-        # 翻转
-        image = torch.flip(image, dims=[1])  # Y 维
-        if raw_boxes.shape[0] > 0:
-            # y 相关: new_y1 = H - old_y2, new_y2 = H - old_y1
-            y1 = raw_boxes[:, 3].copy()
-            y2 = raw_boxes[:, 5].copy()
-            raw_boxes[:, 3] = H - y2
-            raw_boxes[:, 5] = H - y1
-        return image, raw_boxes
+    def __call__(self, image: torch.Tensor, boxes: torch.Tensor):
+        if torch.rand(1).item() >= self.prob:
+            return image, boxes
+        _, height, _ = image.shape
+        image = torch.flip(image, dims=[1])
+        if boxes.numel() > 0:
+            boxes = boxes.clone()
+            y1 = boxes[:, 1].clone()
+            y2 = boxes[:, 3].clone()
+            boxes[:, 1] = height - y2
+            boxes[:, 3] = height - y1
+        return image, boxes
     
 @TRANSFORMS.register("SeaClutterInjection")
 class SeaClutterInjection:
@@ -108,71 +104,68 @@ class SeaClutterInjection:
         self.background_only = background_only
         self.eps = eps
 
-    def __call__(self, image: torch.Tensor, raw_boxes: np.ndarray):
-        if np.random.rand() >= self.prob:
-            return image, raw_boxes
+    def __call__(self, image: torch.Tensor, boxes: torch.Tensor):
+        if torch.rand(1).item() >= self.prob:
+            return image, boxes
 
-        C, H, W = image.shape
-        img_np = image.cpu().numpy()
+        image = image.float()
+        channels, height, width = image.shape
 
-        if C == 2:  # 复栈 real/imag
-            real = img_np[0]
-            imag = img_np[1]
-            amp = np.sqrt(real**2 + imag**2)
+        if channels == 2:
+            real = image[0].clone()
+            imag = image[1].clone()
+            amp = torch.sqrt(real.square() + imag.square())
             is_complex = True
         else:
-            amp = np.abs(img_np[0])
+            amp = image[0].abs()
             is_complex = False
 
-        # 计算目标区域掩码
-        if raw_boxes.shape[0] > 0:
-            mask = np.zeros((H, W), dtype=bool)
-            for b in raw_boxes:
-                x1, y1, x2, y2 = int(b[2]), int(b[3]), int(b[4]), int(b[5])
-                x1 = max(0, min(W - 1, x1))
-                x2 = max(0, min(W, x2))
-                y1 = max(0, min(H - 1, y1))
-                y2 = max(0, min(H, y2))
+        mask = None
+        if boxes.numel() > 0:
+            mask = torch.zeros((height, width), dtype=torch.bool, device=image.device)
+            for box in boxes:
+                x1 = int(box[0].clamp(0, width - 1).item())
+                y1 = int(box[1].clamp(0, height - 1).item())
+                x2 = int(box[2].clamp(0, width).item())
+                y2 = int(box[3].clamp(0, height).item())
                 if x2 > x1 and y2 > y1:
                     mask[y1:y2, x1:x2] = True
-            if mask.any():
-                signal_power = float((amp[mask]**2).mean() + self.eps)
-            else:
-                signal_power = float((amp**2).mean() + self.eps)
-        else:
-            signal_power = float((amp**2).mean() + self.eps)
 
-        snr_db = np.random.uniform(*self.snr_db_range)
-        snr_lin = 10.0**(snr_db / 10.0)
+        if mask is not None and mask.any():
+            signal_power = float(amp[mask].square().mean().item() + self.eps)
+        else:
+            signal_power = float(amp.square().mean().item() + self.eps)
+
+        snr_db = torch.empty(1).uniform_(*self.snr_db_range).item()
+        snr_lin = 10.0 ** (snr_db / 10.0)
         noise_power = signal_power / (snr_lin + self.eps)
-        # 复噪声 sigma^2 = noise_power => real/imag 方差 = noise_power/2
-        sigma = np.sqrt(noise_power)
+        sigma = math.sqrt(noise_power)
 
         if is_complex:
-            noise_real = np.random.normal(0.0, sigma / np.sqrt(2), size=(H, W))
-            noise_imag = np.random.normal(0.0, sigma / np.sqrt(2), size=(H, W))
-            if self.background_only and raw_boxes.shape[0] > 0:
+            sigma_half = sigma / math.sqrt(2.0)
+            noise_real = torch.randn((height, width), dtype=image.dtype, device=image.device) * sigma_half
+            noise_imag = torch.randn((height, width), dtype=image.dtype, device=image.device) * sigma_half
+            if self.background_only and mask is not None:
                 bg_mask = ~mask
                 real[bg_mask] += noise_real[bg_mask]
                 imag[bg_mask] += noise_imag[bg_mask]
             else:
                 real += noise_real
                 imag += noise_imag
-            out = np.stack([real, imag], axis=0).astype(np.float32)
+            image = torch.stack([real, imag], dim=0)
         else:
-            # 幅度噪声: 生成复噪声取幅度 -> Rayleigh 近似
-            noise_real = np.random.normal(0.0, sigma / np.sqrt(2), size=(H, W))
-            noise_imag = np.random.normal(0.0, sigma / np.sqrt(2), size=(H, W))
-            noise_amp = np.sqrt(noise_real**2 + noise_imag**2)
-            if self.background_only and raw_boxes.shape[0] > 0:
+            sigma_half = sigma / math.sqrt(2.0)
+            noise_real = torch.randn((height, width), dtype=image.dtype, device=image.device) * sigma_half
+            noise_imag = torch.randn((height, width), dtype=image.dtype, device=image.device) * sigma_half
+            noise_amp = torch.sqrt(noise_real.square() + noise_imag.square())
+            image = image.clone()
+            if self.background_only and mask is not None:
                 bg_mask = ~mask
-                img_np[0][bg_mask] += noise_amp[bg_mask]
+                image[0][bg_mask] += noise_amp[bg_mask]
             else:
-                img_np[0] += noise_amp
-            out = img_np.astype(np.float32)
+                image[0] += noise_amp
 
-        image = torch.from_numpy(out)
-        return image, raw_boxes
+        return image.to(dtype=torch.float32), boxes
     
 @TRANSFORMS.register("PadToStride")
 class PadToStride:
@@ -188,7 +181,7 @@ class PadToStride:
         self.stride = stride
         self.pad_value = pad_value
 
-    def __call__(self, image: torch.Tensor, raw_boxes: np.ndarray):
+    def __call__(self, image: torch.Tensor, boxes: torch.Tensor):
         # image: [C,H,W]
         C, H, W = image.shape
         s = self.stride
@@ -201,7 +194,7 @@ class PadToStride:
 
         if H_pad == H and W_pad == W:
             # 已经是 stride 倍数，直接返回
-            return image, raw_boxes
+            return image, boxes
 
         pad_bottom = H_pad - H
         pad_right = W_pad - W
@@ -217,16 +210,14 @@ class PadToStride:
         pad_tensor[:, :H, :W] = image
         image = pad_tensor
 
-        # raw_boxes 坐标无需平移；但要裁剪到新边界（避免越界）
-        if raw_boxes.shape[0] > 0:
-            # [class_id, obj_id, x1, y1, x2, y2]
-            # 保持 x1,y1,x2,y2 不变，但剪裁到 [0,W_pad] / [0,H_pad]
-            raw_boxes[:, 2] = np.clip(raw_boxes[:, 2], 0, W_pad - 1)
-            raw_boxes[:, 4] = np.clip(raw_boxes[:, 4], 0, W_pad)
-            raw_boxes[:, 3] = np.clip(raw_boxes[:, 3], 0, H_pad - 1)
-            raw_boxes[:, 5] = np.clip(raw_boxes[:, 5], 0, H_pad)
+        if boxes.numel() > 0:
+            boxes = boxes.clone()
+            boxes[:, 0] = boxes[:, 0].clamp(0, W_pad - 1)
+            boxes[:, 2] = boxes[:, 2].clamp(0, W_pad)
+            boxes[:, 1] = boxes[:, 1].clamp(0, H_pad - 1)
+            boxes[:, 3] = boxes[:, 3].clamp(0, H_pad)
 
-        return image, raw_boxes
+        return image, boxes
 
 
 # 便捷函数：构造典型增强流水线

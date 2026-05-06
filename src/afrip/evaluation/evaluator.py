@@ -7,7 +7,6 @@ import numpy as np
 import torch
 
 from afrip.core import BaseDetector
-from afrip.models import normalize_detection_detections
 from afrip.evaluation.map_metrics import MAPCalculator
 from afrip.evaluation.visualize import visualize_full_predictions, plot_roc_curve
 
@@ -113,7 +112,7 @@ class Evaluator:
             metas  = batch.get("batch_meta", None)
 
             # ── GT 组装 ───────────────────────────────────────
-            gt_xyxy = batch["raw_boxes"][:, 3:].clone()
+            gt_xyxy = batch["targets"][0]["boxes"].to(dtype=torch.float32).clone()
             if gt_xyxy.numel() > 0:
                 mask = torch.zeros((H, W), dtype=torch.bool)
                 for b in gt_xyxy:
@@ -148,9 +147,9 @@ class Evaluator:
             ground_truth_data[file_id] = gt_list
 
             # ── 推理 ─────────────────────────────────────────
-            preds = normalize_detection_detections(model(images))
-            pred_bboxes = preds.boxes
-            pred_scores = preds.scores
+            preds = model(images)
+            pred_bboxes = preds["boxes"]
+            pred_scores = preds["scores"]
 
             # 过滤非法框
             if pred_bboxes.numel() > 0:

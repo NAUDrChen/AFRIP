@@ -8,9 +8,6 @@ import torch.nn.functional as F
 
 from afrip.models.common import (
     LOSSES,
-    DetectionModelOutput,
-    normalize_detection_output,
-    normalize_detection_targets,
     build_matcher,
 )
 from afrip.models.matchers.yolo_matcher import YoloMatcher
@@ -62,8 +59,8 @@ class YoloRTCriterion:
 
     def __call__(
         self,
-        outputs: DetectionModelOutput | dict[str, Any],
-        targets: list[dict],
+        outputs: Any,
+        targets: list[dict[str, torch.Tensor]],
         epoch: int = 0,
     ) -> dict[str, Any]:
         """计算总损失。
@@ -77,17 +74,17 @@ class YoloRTCriterion:
         Returns:
             dict 包含 ``loss_obj``、``loss_box``、``losses``、``empty_frame``。
         """
-        outputs = normalize_detection_output(outputs)
-        normalized_targets = normalize_detection_targets(targets)
-        device = outputs.pred_obj.device
-        stride = outputs.stride
-        fmp_size = outputs.fmp_size
+        if not isinstance(outputs, dict):
+            outputs = outputs.as_dict()
+        device = outputs["pred_obj"].device
+        stride = int(outputs["stride"])
+        fmp_size = tuple(outputs["fmp_size"])
 
-        pred_obj = outputs.pred_obj.view(-1)       # [BM,]
-        pred_box = outputs.pred_box.view(-1, 4)    # [BM, 4]
+        pred_obj = outputs["pred_obj"].view(-1)       # [BM,]
+        pred_box = outputs["pred_box"].view(-1, 4)    # [BM, 4]
 
         gt_objectness, _, gt_bboxes = self.matcher(
-            fmp_size=fmp_size, stride=stride, targets=normalized_targets
+            fmp_size=fmp_size, stride=stride, targets=targets
         )
         gt_objectness = gt_objectness.view(-1).to(device).float()
         gt_bboxes     = gt_bboxes.view(-1, 4).to(device).float()

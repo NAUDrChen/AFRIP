@@ -226,7 +226,7 @@ def visualize_batch_with_full(dataset: RadarWindowDataset,
     归一显示: norm = clip((dB - p1)/(p99 - p1), 0, 1) 其中 p1,p99 为分位数增强对比度
     """
     images = batch["images"]      # [B,C,H,W]
-    raw_boxes = batch["raw_boxes"]  # [M,8]
+    targets = batch["targets"]
     metas = batch["batch_meta"]
     B, C, H, W = images.shape
 
@@ -234,10 +234,16 @@ def visualize_batch_with_full(dataset: RadarWindowDataset,
     for i, m in enumerate(metas):
         file_groups.setdefault(m["file"], []).append(i)
 
-    per_sample_boxes = [[] for _ in range(B)]
-    for rb in raw_boxes:
-        bi = int(rb[0].item())
-        per_sample_boxes[bi].append(rb[1:].cpu().numpy())
+    per_sample_boxes = [
+        [
+            {
+                "class_id": int(label.item()),
+                "box": box.cpu().numpy(),
+            }
+            for box, label in zip(target["boxes"], target["labels"])
+        ]
+        for target in targets
+    ]
 
     eps = 1e-12  # 防 log(0)
 
@@ -302,13 +308,14 @@ def visualize_batch_with_full(dataset: RadarWindowDataset,
                 ax.set_title(f"Slice #{si}\ndB[{vmin_w:.1f},{vmax_w:.1f}]")
             ax.set_axis_off()
 
-            for box in per_sample_boxes[si]:
-                class_id, obj_id, x1, y1, x2, y2 = box
+            for entry in per_sample_boxes[si]:
+                class_id = entry["class_id"]
+                x1, y1, x2, y2 = entry["box"]
                 rect = Rectangle((x1, y1), x2 - x1, y2 - y1,
                                  edgecolor='lime', facecolor='none', linewidth=1)
                 ax.add_patch(rect)
                 ax.text(x1, max(0, y1 - 3),
-                        f"c{int(class_id)} id{int(obj_id)}",
+                        f"c{int(class_id)}",
                         color='yellow', fontsize=7, backgroundcolor='black')
 
         plt.tight_layout()

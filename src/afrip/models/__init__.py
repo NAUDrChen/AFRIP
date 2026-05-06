@@ -4,9 +4,6 @@ from .common import (  # noqa: F401
     COMMON_BLOCKS,
     build_detector, build_backbone, build_neck, build_head,
     build_matcher, build_loss, build_common_block, normalize_detector_config,
-    DetectionBatch, DetectionDetections, DetectionModelOutput, DetectionTarget,
-    normalize_detection_batch, normalize_detection_detections,
-    normalize_detection_output, normalize_detection_targets,
     assemble_detection_components,
 )
 from .backbones import resnet         # noqa: F401  触发注册

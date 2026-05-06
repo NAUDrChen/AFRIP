@@ -390,7 +390,7 @@ class RadarWindowDataset(BaseDataset):
         boxes: List[Dict[str, Any]],
         y0: int,
         x0: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         窗口内目标筛选:
         交集计算:
@@ -402,15 +402,9 @@ class RadarWindowDataset(BaseDataset):
                 inter_y2 = min(y2, win_y2)
           若 inter_x2 <= inter_x1 或 inter_y2 <= inter_y1 => 无交集
           面积: inter_w * inter_h < self.min_box_area 过滤最小面积
-        YOLO 坐标:
-          cx = (local_x1 + local_x2)/2
-          cy = (local_y1 + local_y2)/2
-          bw = local_x2 - local_x1
-          bh = local_y2 - local_y1
-          归一化: 除以 (window_w, window_h)
         """
-        out_raw = []
-        out_yolo = []
+        out_boxes: list[list[float]] = []
+        out_labels: list[int] = []
         for b in boxes:
             x1 = b["x1"]
             y1 = b["y1"]
@@ -444,84 +438,35 @@ class RadarWindowDataset(BaseDataset):
 
             class_name = b["class_name"]
             class_id = self.class_mapping.get(class_name, 0)  # 默认0
-            obj_id = b["obj_id"]
+            out_boxes.append([local_x1, local_y1, local_x2, local_y2])
+            out_labels.append(class_id)
 
-            out_raw.append([class_id, obj_id, local_x1, local_y1, local_x2, local_y2])
-
-            # 转 YOLO 格式 (cx,cy,w,h) 归一化
-            cx = (local_x1 + local_x2) / 2.0  # (x1+x2)/2
-            cy = (local_y1 + local_y2) / 2.0  # (y1+y2)/2
-            bw = local_x2 - local_x1          # w = x2 - x1
-            bh = local_y2 - local_y1          # h = y2 - y1
-            # 归一化: / window 尺寸
-            cx_n = cx / self.window_w
-            cy_n = cy / self.window_h
-            bw_n = bw / self.window_w
-            bh_n = bh / self.window_h
-            out_yolo.append([class_id, obj_id, cx_n, cy_n, bw_n, bh_n])
-
-        if out_raw:
+        if out_boxes:
             return (
-                np.array(out_raw, dtype=np.float32),
-                np.array(out_yolo, dtype=np.float32)
+                torch.tensor(out_boxes, dtype=torch.float32),
+                torch.tensor(out_labels, dtype=torch.long),
             )
-        else:
-            return (
-                np.zeros((0, 6), dtype=np.float32),
-                np.zeros((0, 6), dtype=np.float32)
-            )
-
-    def _raw_to_yolo(self, raw_boxes: np.ndarray) -> np.ndarray:
-        # raw_boxes: [N,6] => [class_id, obj_id, x1, y1, x2, y2]
-        if raw_boxes.shape[0] == 0:
-            return np.zeros((0,6), dtype=np.float32)
-        out = []
-        for r in raw_boxes:
-            class_id, obj_id, x1, y1, x2, y2 = r
-            cx = (x1 + x2) / 2.0
-            cy = (y1 + y2) / 2.0
-            w = (x2 - x1)
-            h = (y2 - y1)
-            cx_n = cx / self.window_w
-            cy_n = cy / self.window_h
-            w_n = w / self.window_w
-            h_n = h / self.window_h
-            out.append([class_id, obj_id, cx_n, cy_n, w_n, h_n])
-        return np.array(out, dtype=np.float32)
+        return (
+            torch.zeros((0, 4), dtype=torch.float32),
+            torch.zeros((0,), dtype=torch.long),
+        )
 
     def __getitem__(self, idx: int):
         file, y0, x0 = self.index[idx]
         full = self._load_full_matrix(file)
         window = self._extract_window(full, y0, x0)  # (H,W)
-        tensor = self._convert_complex(window)  # [C,H,W]
+        image = torch.from_numpy(self._convert_complex(window)).float()
 
-        boxes = self.file_to_boxes.get(file, [])
-        raw_boxes, yolo_boxes = self._boxes_in_window(boxes, y0, x0)
+        annotations = self.file_to_boxes.get(file, [])
+        boxes, labels = self._boxes_in_window(annotations, y0, x0)
 
-        # 应用 transform (若存在)
         if self.transforms is not None:
-            tensor_t = torch.from_numpy(tensor)  # 先转 tensor
-            tensor_t, raw_boxes = self.transforms(tensor_t, raw_boxes)
-            # 重新生成 yolo
-            yolo_boxes = self._raw_to_yolo(raw_boxes)
-            # 保持 raw_boxes, yolo_boxes 为 numpy 格式后再转 torch
-            tensor = tensor_t.numpy()
-        else:
-            yolo_boxes = self._raw_to_yolo(raw_boxes)
-            
-        # 构造 targets 为 List[Dict]，单元素：{'boxes': [N,4], 'labels': [N,]}
-        if raw_boxes.shape[0] > 0:
-            tgt_boxes = torch.from_numpy(yolo_boxes[:, 2:6]).float()      # [cx, cy, w, h]
-            tgt_labels = torch.from_numpy(raw_boxes[:, 0]).long()        # class_id
-        else:
-            tgt_boxes = torch.zeros((0, 4), dtype=torch.float32)
-            tgt_labels = torch.zeros((0,), dtype=torch.long)
-        targets_list = [{"boxes": tgt_boxes, "labels": tgt_labels}]
+            image, boxes = self.transforms(image, boxes)
 
         sample = {
-            "image": torch.from_numpy(tensor),
-            "targets": targets_list,                # List[Dict]
-            "raw_boxes": torch.from_numpy(raw_boxes),
+            "image": image,
+            "boxes": boxes.to(dtype=torch.float32),
+            "labels": labels.to(dtype=torch.long),
             "meta": {
                 "file": file,
                 "global_origin": (y0, x0),
@@ -533,25 +478,16 @@ class RadarWindowDataset(BaseDataset):
     @staticmethod
     def collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         images = torch.stack([b["image"] for b in batch], dim=0)
-
-        # __getitem__ 中 targets 始终是长度为 1 的列表，取其第 0 个 Dict
-        targets = [b["targets"][0] for b in batch]
-
-        raw_boxes_list = []
-        for bi, b in enumerate(batch):
-            rb = b["raw_boxes"]  # [N,6] 或空
-            if rb.numel() > 0:
-                bi_col = torch.full((rb.shape[0], 1), bi, dtype=rb.dtype)
-                raw_boxes_list.append(torch.cat([bi_col, rb], dim=1))  # [N,7]
-
-        if raw_boxes_list:
-            raw_boxes = torch.cat(raw_boxes_list, dim=0)
-        else:
-            raw_boxes = torch.zeros((0, 7), dtype=torch.float32)
+        targets = [
+            {
+                "boxes": sample["boxes"],
+                "labels": sample["labels"],
+            }
+            for sample in batch
+        ]
 
         return {
             "images": images,              # [B,C,H,W]
             "targets": targets,            # List[Dict{boxes:[Ni,4], labels:[Ni]}]
-            "raw_boxes": raw_boxes,        # [M,7]: (batch_index,class_id,obj_id,x1,y1,x2,y2)
             "batch_meta": [b["meta"] for b in batch]
         }

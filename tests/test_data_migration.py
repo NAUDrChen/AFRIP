@@ -1,7 +1,6 @@
 
 """测试数据层迁移效果：配置→注册→数据加载→增强→batch"""
 from pathlib import Path
-import numpy as np
 import torch
 
 from afrip.utils import load_config
@@ -80,10 +79,10 @@ def test_transform_execution():
     pipeline = build_transform_pipeline(config.get("train_transforms"))
 
     fake_image = torch.randn(1, 256, 256)
-    fake_boxes = np.array([
-        [0, 0, 100, 100, 200, 200],
-        [1, 1, 150, 150, 250, 250],
-    ], dtype=np.float32)
+    fake_boxes = torch.tensor([
+        [100.0, 100.0, 200.0, 200.0],
+        [150.0, 150.0, 250.0, 250.0],
+    ], dtype=torch.float32)
 
     image_out, boxes_out = pipeline(fake_image, fake_boxes)
 
@@ -132,14 +131,14 @@ def test_batch_structure():
     batch = [
         {
             "image": torch.randn(1, 256, 256),
-            "targets": [{"boxes": torch.randn(2, 4), "labels": torch.tensor([0, 1])}],
-            "raw_boxes": torch.randn(2, 6),
+            "boxes": torch.randn(2, 4),
+            "labels": torch.tensor([0, 1]),
             "meta": {"file": "sample1.mat", "global_origin": (0, 0), "index": 0}
         },
         {
             "image": torch.randn(1, 256, 256),
-            "targets": [{"boxes": torch.randn(3, 4), "labels": torch.tensor([1, 0, 2])}],
-            "raw_boxes": torch.randn(3, 6),
+            "boxes": torch.randn(3, 4),
+            "labels": torch.tensor([1, 0, 2]),
             "meta": {"file": "sample2.mat", "global_origin": (256, 0), "index": 1}
         },
     ]
@@ -149,11 +148,11 @@ def test_batch_structure():
     
     print(f"Batch 中 images shape: {collated['images'].shape}")
     print(f"Batch 中 targets 数量: {len(collated['targets'])}")
-    print(f"Batch 中 raw_boxes shape: {collated['raw_boxes'].shape}")
     print(f"Batch metadata 数量: {len(collated['batch_meta'])}")
     
     assert collated['images'].shape == (2, 1, 256, 256), "images 尺寸不对"
     assert len(collated['targets']) == 2, "targets 数量不对"
+    assert collated['targets'][0]['boxes'].shape == (2, 4), "boxes 尺寸不对"
     print("✓ Batch 结构正确\n")
 
 

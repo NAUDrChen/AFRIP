@@ -1,4 +1,4 @@
-"""Shared model building blocks, contracts and assembly helpers."""
+"""Shared model building blocks, registries and assembly helpers."""
 from .blocks import (  # noqa: F401
     Conv,
     ConvBlock,
@@ -9,16 +9,6 @@ from .blocks import (  # noqa: F401
     get_activation,
     get_norm,
     _adapt_first_conv_weight,
-)
-from .contracts import (  # noqa: F401
-    DetectionBatch,
-    DetectionDetections,
-    DetectionModelOutput,
-    DetectionTarget,
-    normalize_detection_batch,
-    normalize_detection_detections,
-    normalize_detection_output,
-    normalize_detection_targets,
 )
 from .registry import (  # noqa: F401
     BACKBONES,
@@ -56,14 +46,6 @@ __all__ = [
     "get_activation",
     "get_norm",
     "_adapt_first_conv_weight",
-    "DetectionBatch",
-    "DetectionDetections",
-    "DetectionModelOutput",
-    "DetectionTarget",
-    "normalize_detection_batch",
-    "normalize_detection_detections",
-    "normalize_detection_output",
-    "normalize_detection_targets",
     "build_backbone",
     "build_common_block",
     "build_detector",

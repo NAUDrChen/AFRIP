@@ -1,7 +1,7 @@
 """YOLO 风格 objectness-based 后处理组件。"""
 from __future__ import annotations
 
-import numpy as np
+import torch
 
 from afrip.modules.registry import POSTPROCESSORS
 from afrip.utils.nms import multiclass_nms
@@ -38,26 +38,34 @@ class YOLOObjectnessPostprocessor:
 
     def __call__(
         self,
-        bboxes: np.ndarray,
-        obj_scores: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        keep = np.where(obj_scores >= self.conf_thresh)[0]
+        bboxes: torch.Tensor,
+        obj_scores: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        keep = torch.where(obj_scores >= self.conf_thresh)[0]
         bboxes = bboxes[keep]
         scores = obj_scores[keep]
-        labels = np.zeros(len(scores), dtype=np.int32)
+        labels = torch.zeros((scores.shape[0],), dtype=torch.long, device=scores.device)
 
-        if len(bboxes) == 0:
-            return bboxes, scores, labels
+        if bboxes.numel() == 0:
+            return {
+                "boxes": bboxes.reshape(0, 4),
+                "scores": scores.reshape(0),
+                "labels": labels.reshape(0),
+            }
 
-        finite = np.isfinite(bboxes).all(axis=1)
+        finite = torch.isfinite(bboxes).all(dim=1)
         proper = (bboxes[:, 2] > bboxes[:, 0]) & (bboxes[:, 3] > bboxes[:, 1])
         mask = finite & proper
         bboxes = bboxes[mask]
         scores = scores[mask]
         labels = labels[mask]
 
-        if len(bboxes) == 0:
-            return bboxes, scores, labels
+        if bboxes.numel() == 0:
+            return {
+                "boxes": bboxes.reshape(0, 4),
+                "scores": scores.reshape(0),
+                "labels": labels.reshape(0),
+            }
 
         scores, labels, bboxes = multiclass_nms(
             scores,
@@ -72,4 +80,8 @@ class YOLOObjectnessPostprocessor:
             soft_nms_score_thresh=self.soft_nms_score_thresh,
             topk=self.topk,
         )
-        return bboxes, scores, labels
+        return {
+            "boxes": bboxes.to(dtype=torch.float32),
+            "scores": scores.to(dtype=torch.float32),
+            "labels": labels.to(dtype=torch.long),
+        }

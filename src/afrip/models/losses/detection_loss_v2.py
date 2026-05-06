@@ -8,9 +8,6 @@ import torch.nn.functional as F
 
 from afrip.models.common import (
     LOSSES,
-    DetectionModelOutput,
-    normalize_detection_output,
-    normalize_detection_targets,
     build_matcher,
 )
 
@@ -48,16 +45,6 @@ class YoloRTv2Criterion:
             "assign_force_level": assign_force_level,
         }
         self.matcher = build_matcher(matcher_cfg) if matcher_cfg is not None else None
-
-    @staticmethod
-    def _cxcywh_to_xyxy(boxes: torch.Tensor, img_w: int, img_h: int) -> torch.Tensor:
-        if boxes.numel() == 0:
-            return boxes.new_zeros((0, 4))
-        cx = boxes[:, 0] * img_w
-        cy = boxes[:, 1] * img_h
-        w = boxes[:, 2] * img_w
-        h = boxes[:, 3] * img_h
-        return torch.stack([cx - 0.5 * w, cy - 0.5 * h, cx + 0.5 * w, cy + 0.5 * h], dim=-1)
 
     @staticmethod
     def _diag_iou(boxes1: torch.Tensor, boxes2: torch.Tensor) -> torch.Tensor:
@@ -202,15 +189,15 @@ class YoloRTv2Criterion:
             gt_box[pos] = gt_boxes_xyxy[assigned_gt[pos]]
         return gt_obj, gt_box
 
-    def __call__(self, outputs: DetectionModelOutput | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, Any]:
-        outputs = normalize_detection_output(outputs)
-        normalized_targets = normalize_detection_targets(targets)
-        pred_obj = outputs.pred_obj
-        pred_box = outputs.pred_box
+    def __call__(self, outputs: Any, targets: list[dict[str, torch.Tensor]], epoch: int = 0) -> dict[str, Any]:
+        if not isinstance(outputs, dict):
+            outputs = outputs.as_dict()
+        pred_obj = outputs["pred_obj"]
+        pred_box = outputs["pred_box"]
         batch_size, num_points, _ = pred_obj.shape
 
-        strides_all = outputs.strides
-        fmp_sizes_all = outputs.feature_shapes
+        strides_all = [int(stride) for stride in outputs["strides_all"]]
+        fmp_sizes_all = [tuple(size) for size in outputs["fmp_sizes_all"]]
 
         img_h = max(int(h * s) for (h, _), s in zip(fmp_sizes_all, strides_all))
         img_w = max(int(w * s) for (_, w), s in zip(fmp_sizes_all, strides_all))
@@ -231,16 +218,15 @@ class YoloRTv2Criterion:
         any_empty = True
 
         for batch_index in range(batch_size):
-            target = normalized_targets[batch_index]
-            gt_boxes_norm = target.boxes.to(pred_box.device)
+            target = targets[batch_index]
+            gt_boxes_xyxy = target["boxes"].to(pred_box.device, dtype=torch.float32)
             pred_obj_b = pred_obj[batch_index].view(-1)
             pred_box_b = pred_box[batch_index]
             gt_obj = pred_obj_b.new_zeros((num_points,), dtype=torch.float32)
             gt_box = pred_box_b.new_zeros((num_points, 4), dtype=torch.float32)
 
-            if gt_boxes_norm.shape[0] > 0:
+            if gt_boxes_xyxy.shape[0] > 0:
                 any_empty = False
-                gt_boxes_xyxy = self._cxcywh_to_xyxy(gt_boxes_norm, img_w, img_h)
 
                 if self.assigner == "center":
                     for lvl, (stride_l, (h_l, w_l)) in enumerate(zip(strides_all, fmp_sizes_all)):
