@@ -1,7 +1,7 @@
 dataset:
   type: RadarWindowDataset
-  mat_dir: G:\Data\data
-  csv_path: G:\Data\data\data_mat.csv
+  mat_dir: D:\Data\JHT\data
+  csv_path: D:\Data\JHT\data\data_mat.csv
   window_size: [640, 640]
   stride: [320, 320]
   complex_mode: abs

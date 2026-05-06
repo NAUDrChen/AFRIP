@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from afrip.core import BaseDataset, BaseDetector
 from afrip.datasets import build_dataset, build_transform_pipeline
-from afrip.models import assemble_detection_components
+from afrip.models import DetectionBatch, assemble_detection_components
 from afrip.strategies import build_optimizer, build_scheduler
 
 # 顶层全局：供 DataLoader worker 初始化函数访问
@@ -72,7 +72,7 @@ class Trainer:
         self.eval_interval = train_cfg.get("eval_interval", 5)
         self.clip_grad     = train_cfg.get("clip_grad", 0.0)
         self.log_interval  = rt.get("log_interval", 10)
-        self._last_opt_step = -1
+        self._last_opt_step = 0
 
         # ── 混合精度 scaler ───────────────────────────────────
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
@@ -178,7 +178,6 @@ class Trainer:
         self.model.train()
         if isinstance(self.model, BaseDetector):
             self.model.set_training_behavior(True)
-        self.optimizer.zero_grad()
 
         batch_size  = self.cfg.get("dataloader", {}).get("batch_size", 4)
         epoch_size  = len(self.train_loader)
@@ -187,12 +186,12 @@ class Trainer:
         warmup_bias = self._sched_cfg.get("warmup_bias_lr",  0.1)
         warmup_mom  = self._sched_cfg.get("warmup_momentum", 0.8)
         momentum    = self._optim_cfg.get("momentum",        0.937)
-        pending_step = False
 
         t0 = time.time()
         for iter_i, batch in enumerate(self.train_loader):
-            images = batch["images"].to(self.device, non_blocking=True).float()
-            targets = batch["targets"]
+            batch_contract = DetectionBatch.from_mapping(batch)
+            images = batch_contract.images.to(self.device, non_blocking=True).float()
+            targets = batch_contract.targets
             ni      = iter_i + epoch * epoch_size
 
             # 梯度累积步数（模拟 effective batch_size=64）
@@ -206,7 +205,7 @@ class Trainer:
                     pg["lr"] = np.interp(
                         ni, xi,
                         [warmup_bias if j == 0 else 0.0,
-                         pg["initial_lr"] * self.lf(epoch)],
+                         pg["initial_lr"] * self.lr_scheduler.lr_lambdas(epoch)],
                     )
                     if "momentum" in pg:
                         pg["momentum"] = np.interp(
@@ -221,9 +220,8 @@ class Trainer:
                 losses = loss_dict["losses"] * images.shape[0]
 
             self.scaler.scale(losses).backward()
-            pending_step = True
 
-            if ni - last_opt + 1 >= accumulate:
+            if ni - last_opt >= accumulate:
                 if self.clip_grad > 0:
                     self.scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
@@ -234,7 +232,6 @@ class Trainer:
                 self.optimizer.zero_grad()
                 last_opt     = ni
                 self._last_opt_step = last_opt
-                pending_step = False
 
             if iter_i % self.log_interval == 0:
                 t1     = time.time()
@@ -251,17 +248,6 @@ class Trainer:
                 log += f"[{t1 - t0:.2f}s]"
                 print(log, flush=True)
                 t0 = time.time()
-
-        if pending_step:
-            if self.clip_grad > 0:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), max_norm=self.clip_grad
-                )
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.optimizer.zero_grad()
-            self._last_opt_step = epoch * epoch_size + max(epoch_size - 1, 0)
 
     # ─────────────────────────── 主训练循环 ───────────────────────────
 

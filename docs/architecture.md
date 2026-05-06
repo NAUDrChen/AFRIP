@@ -8,7 +8,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 - `core/`：提供注册机制、构建逻辑和统一抽象
 - `datasets/`：管理数据加载、增强、采样和批处理
-- `models/`：承载骨干、颈部、检测头、匹配器、损失、跟踪器及 common 装配/契约模块
+- `models/`：承载骨干、颈部、检测头、匹配器、损失、跟踪器及 common 下的 blocks / registry / config-driven assembly
 - `modules/`：容纳预处理、后处理、关联、滤波、神经网络等可重用模块
 - `engine/`：统一训练、评估和推理运行逻辑
 - `strategies/`：组织优化器、调度器、损失权重策略、预训练加载策略
@@ -23,8 +23,65 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - 基础模块通过注册器按需构建，避免硬编码依赖
 - 检测模型装配通过配置图定义特征流、组件引用和预测层，不再为不同 detector 版本维护独立 Python 类
 - 脚本层只负责组装，不直接承载业务细节
+- 跨模块公共接口优先使用普通 `dict[str, Tensor]`，避免为数据语义再叠加一层契约封装
 
-## 4. 推荐扩展顺序
+## 4. 统一张量与坐标约定
+
+### 4.1 图像张量
+
+- 单样本图像统一为 `torch.float32`，形状 `[C, H, W]`
+- 批量图像统一为 `torch.float32`，形状 `[B, C, H, W]`
+- 数据集、增强、预处理、骨干网络、检测头和评估入口都使用这一表示
+
+### 4.2 边界框与标签
+
+- 公共边界框格式统一为绝对坐标 `xyxy`，即 `[x1, y1, x2, y2]`
+- 边界框张量统一为 `torch.float32`，单样本形状 `[N, 4]`，模型输出形状 `[B, M, 4]` 或推理后 `[K, 4]`
+- 标签统一为 `torch.int64`，单样本形状 `[N]`
+- 分数统一为 `torch.float32`，推理后形状 `[K]`
+- `xyxy` 坐标始终定义在“当前输入图像坐标系”下：训练窗口相对训练窗口，整帧验证相对整帧验证
+- `x2`、`y2` 允许裁剪到图像边界，模块间不再传递归一化 `cxcywh`
+- 若某个算法内部需要 `cxcywh`、中心点或网格坐标，应在模块内部局部转换，而不是把它作为跨模块公共接口
+
+### 4.3 数据集与 batch 语义
+
+- `Dataset.__getitem__` 返回以下字段：
+	- `image`: `[C, H, W]`
+	- `boxes`: `[N, 4]`，`xyxy`
+	- `labels`: `[N]`
+	- `meta`: 文件名、窗口原点、索引等非张量元信息
+- `collate_fn` 返回以下字段：
+	- `images`: `[B, C, H, W]`
+	- `targets`: `list[dict]`，每项含 `boxes` 和 `labels`
+	- `batch_meta`: 长度为 `B` 的元信息列表
+- `batch` 不再额外暴露 `raw_boxes`、`batch_idx + box` 拼接张量或面向旧流程的框封装对象
+
+### 4.4 训练态模型输出
+
+- 训练态 `forward` 返回普通字典，而不是 dataclass / contract 对象
+- 当前检测主链统一输出：
+	- `pred_obj`: `[B, M, 1]`，objectness logits
+	- `pred_box`: `[B, M, 4]`，已经 decode 到输入图像坐标系下的 `xyxy`
+	- `strides_all`: 每个预测层的 stride 列表
+	- `fmp_sizes_all`: 每个预测层的特征图尺寸列表
+	- `stride`、`fmp_size`: 兼容单尺度损失读取的快捷字段
+
+### 4.5 推理态输出
+
+- 推理态 `forward` / `inference` 返回普通字典：
+	- `boxes`: `[K, 4]`
+	- `scores`: `[K]`
+	- `labels`: `[K]`
+- 后处理组件优先接收和返回 `torch.Tensor`
+- `utils/nms.py` 内部仍兼容 `numpy` 输入，但这属于兼容实现细节，不是主流程接口标准
+
+### 4.6 训练、分配、评估中的统一语义
+
+- 标签分配器和损失函数直接消费 `targets[i]["boxes"]` 的 `xyxy` 表示
+- 评估器直接消费 `batch["targets"]` 中的 `xyxy` GT 和模型推理返回的 `boxes`
+- `obj_id`、`batch_idx`、原始文件坐标等信息不再混入公共 box tensor；需要时放入 `meta` 或可视化专用结构
+
+## 5. 推荐扩展顺序
 
 1. 定义 `BaseDataset`、`BaseDetector`、`BaseTracker` 抽象接口（已完成首版）
 2. 增加 `builder` 与统一 `Runner`
@@ -32,12 +89,16 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 4. 为典型雷达任务补齐数据协议与指标
 5. 逐步支持联合训练、多阶段流水线与在线推理
 
-## 5. 当前重构进展
+## 6. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
-- `models/common/` 已集中承载 blocks、registry、contracts 与 config-driven detection assembly
+- `models/common/` 已集中承载 blocks、registry 与 config-driven detection assembly，旧的 detection contracts 已移除
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
+- 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
+- `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
+- 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象
 - 检测器训练/推理模式切换已从隐式 `trainable` 属性迁移到显式接口
 - `engine/runner.py` 已提供最小 `BaseRunner` / `DetectionRunner` 骨架，脚本入口已切换接入
+- 已补充训练/验证 smoke test，覆盖两条主实验配置在统一接口上的一轮真实执行
