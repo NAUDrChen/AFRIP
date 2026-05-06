@@ -58,7 +58,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 ### 4.4 训练态模型输出
 
-- 训练态 `forward` 返回普通字典，而不是 dataclass / contract 对象
+- 训练态 `forward` 返回普通字典，不再返回额外包装对象
 - 当前检测主链统一输出：
 	- `pred_obj`: `[B, M, 1]`，objectness logits
 	- `pred_box`: `[B, M, 4]`，已经 decode 到输入图像坐标系下的 `xyxy`
@@ -92,7 +92,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ## 6. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
-- `models/common/` 已集中承载 blocks、registry 与 config-driven detection assembly，旧的 detection contracts 已移除
+- `models/common/` 已集中承载 blocks、registry 与 config-driven detection assembly，检测主链已统一为普通字典与张量接口
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`

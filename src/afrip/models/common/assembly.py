@@ -38,7 +38,7 @@ def _build_component(config: dict[str, Any], num_classes: int) -> nn.Module:
 class ConfigurableDetectionModel(BaseDetector):
     """Pure-config dense detection assembler.
 
-    Contracts:
+    Interfaces:
     - backbone: returns Tensor or sequence[Tensor]
     - feature_nodes: each node consumes named tensors or backbone outputs
     - head: returns (cls_feat, reg_feat)

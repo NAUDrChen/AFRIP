@@ -20,7 +20,7 @@ class DummyDataset(BaseDataset):
         return {"items": batch}
 
 
-def test_base_dataset_collate_contract() -> None:
+def test_base_dataset_collate_structure() -> None:
     batch = DummyDataset.collate_fn([{"value": 1}, {"value": 2}])
     assert batch == {"items": [{"value": 1}, {"value": 2}]}
 
