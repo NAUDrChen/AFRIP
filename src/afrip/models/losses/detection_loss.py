@@ -1,4 +1,4 @@
-"""YOLORTv1 检测损失（BCE objectness + GIoU box）。"""
+"""Single-scale dense detection loss (BCE objectness + GIoU box)."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,15 +6,20 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from afrip.models.detectors.dense_base import DenseDetectionOutputs, normalize_dense_outputs
-from afrip.models.registry import LOSSES, MATCHERS, build_matcher
+from afrip.models.common import (
+    LOSSES,
+    DetectionModelOutput,
+    normalize_detection_output,
+    normalize_detection_targets,
+    build_matcher,
+)
 from afrip.models.matchers.yolo_matcher import YoloMatcher
 from afrip.utils.box_ops import get_ious
 
 
 @LOSSES.register("YoloRTCriterion")
 class YoloRTCriterion:
-    """YOLORTv1 损失函数。
+    """Single-scale dense objectness criterion.
 
     Args:
         num_classes:           目标类别数。
@@ -57,7 +62,7 @@ class YoloRTCriterion:
 
     def __call__(
         self,
-        outputs: DenseDetectionOutputs | dict[str, Any],
+        outputs: DetectionModelOutput | dict[str, Any],
         targets: list[dict],
         epoch: int = 0,
     ) -> dict[str, Any]:
@@ -72,16 +77,17 @@ class YoloRTCriterion:
         Returns:
             dict 包含 ``loss_obj``、``loss_box``、``losses``、``empty_frame``。
         """
-        outputs = normalize_dense_outputs(outputs)
-        device   = outputs['pred_obj'].device
-        stride   = outputs['stride']
-        fmp_size = outputs['fmp_size']
+        outputs = normalize_detection_output(outputs)
+        normalized_targets = normalize_detection_targets(targets)
+        device = outputs.pred_obj.device
+        stride = outputs.stride
+        fmp_size = outputs.fmp_size
 
-        pred_obj = outputs['pred_obj'].view(-1)       # [BM,]
-        pred_box = outputs['pred_box'].view(-1, 4)    # [BM, 4]
+        pred_obj = outputs.pred_obj.view(-1)       # [BM,]
+        pred_box = outputs.pred_box.view(-1, 4)    # [BM, 4]
 
         gt_objectness, _, gt_bboxes = self.matcher(
-            fmp_size=fmp_size, stride=stride, targets=targets
+            fmp_size=fmp_size, stride=stride, targets=normalized_targets
         )
         gt_objectness = gt_objectness.view(-1).to(device).float()
         gt_bboxes     = gt_bboxes.view(-1, 4).to(device).float()

@@ -7,6 +7,7 @@ import numpy as np
 import torch
 
 from afrip.core import BaseDetector
+from afrip.models import normalize_detection_detections
 from afrip.evaluation.map_metrics import MAPCalculator
 from afrip.evaluation.visualize import visualize_full_predictions, plot_roc_curve
 
@@ -147,17 +148,9 @@ class Evaluator:
             ground_truth_data[file_id] = gt_list
 
             # ── 推理 ─────────────────────────────────────────
-            preds = model(images)
-            if isinstance(preds, (tuple, list)) and len(preds) >= 2:
-                pred_bboxes = preds[0]
-                pred_scores = preds[1]
-                if isinstance(pred_bboxes, np.ndarray):
-                    pred_bboxes = torch.from_numpy(pred_bboxes)
-                if isinstance(pred_scores, np.ndarray):
-                    pred_scores = torch.from_numpy(pred_scores)
-            else:
-                pred_bboxes = torch.zeros((0, 4), dtype=torch.float32)
-                pred_scores = torch.zeros((0,),   dtype=torch.float32)
+            preds = normalize_detection_detections(model(images))
+            pred_bboxes = preds.boxes
+            pred_scores = preds.scores
 
             # 过滤非法框
             if pred_bboxes.numel() > 0:

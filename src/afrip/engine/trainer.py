@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from afrip.core import BaseDataset, BaseDetector
 from afrip.datasets import build_dataset, build_transform_pipeline
-from afrip.models import assemble_detection_components
+from afrip.models import DetectionBatch, assemble_detection_components
 from afrip.strategies import build_optimizer, build_scheduler
 
 # 顶层全局：供 DataLoader worker 初始化函数访问
@@ -189,8 +189,9 @@ class Trainer:
 
         t0 = time.time()
         for iter_i, batch in enumerate(self.train_loader):
-            images  = batch["images"].to(self.device, non_blocking=True).float()
-            targets = batch["targets"]
+            batch_contract = DetectionBatch.from_mapping(batch)
+            images = batch_contract.images.to(self.device, non_blocking=True).float()
+            targets = batch_contract.targets
             ni      = iter_i + epoch * epoch_size
 
             # 梯度累积步数（模拟 effective batch_size=64）

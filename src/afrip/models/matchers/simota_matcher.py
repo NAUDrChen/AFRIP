@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import torch
 
-from afrip.models.registry import MATCHERS
+from afrip.models.common import MATCHERS
 
 
 @MATCHERS.register("SimOTAMatcher")

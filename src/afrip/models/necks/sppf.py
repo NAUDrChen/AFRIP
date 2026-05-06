@@ -4,8 +4,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from afrip.models.registry import NECKS
-from afrip.models.common import Conv
+from afrip.models.common import NECKS, Conv
 
 
 @NECKS.register("SPPF")

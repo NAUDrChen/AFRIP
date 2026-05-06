@@ -1,4 +1,4 @@
-"""YOLORTv2 多尺度检测损失。"""
+"""Multi-scale dense detection loss."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,13 +6,18 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from afrip.models.detectors.dense_base import DenseDetectionOutputs, normalize_dense_outputs
-from afrip.models.registry import LOSSES, build_matcher
+from afrip.models.common import (
+    LOSSES,
+    DetectionModelOutput,
+    normalize_detection_output,
+    normalize_detection_targets,
+    build_matcher,
+)
 
 
 @LOSSES.register("YoloRTv2Criterion")
 class YoloRTv2Criterion:
-    """多尺度 YOLORTv2 损失：objectness + box，支持 center/pointwise/simota 分配。"""
+    """多尺度 dense objectness 损失：objectness + box，支持 center/pointwise/simota 分配。"""
 
     def __init__(
         self,
@@ -197,17 +202,15 @@ class YoloRTv2Criterion:
             gt_box[pos] = gt_boxes_xyxy[assigned_gt[pos]]
         return gt_obj, gt_box
 
-    def __call__(self, outputs: DenseDetectionOutputs | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, Any]:
-        outputs = normalize_dense_outputs(outputs)
-        pred_obj = outputs["pred_obj"]
-        pred_box = outputs["pred_box"]
+    def __call__(self, outputs: DetectionModelOutput | dict[str, Any], targets: list[dict], epoch: int = 0) -> dict[str, Any]:
+        outputs = normalize_detection_output(outputs)
+        normalized_targets = normalize_detection_targets(targets)
+        pred_obj = outputs.pred_obj
+        pred_box = outputs.pred_box
         batch_size, num_points, _ = pred_obj.shape
 
-        strides_all = outputs.get("strides_all")
-        fmp_sizes_all = outputs.get("fmp_sizes_all")
-        if strides_all is None or fmp_sizes_all is None:
-            strides_all = [outputs["stride"]]
-            fmp_sizes_all = [outputs["fmp_size"]]
+        strides_all = outputs.strides
+        fmp_sizes_all = outputs.feature_shapes
 
         img_h = max(int(h * s) for (h, _), s in zip(fmp_sizes_all, strides_all))
         img_w = max(int(w * s) for (_, w), s in zip(fmp_sizes_all, strides_all))
@@ -228,8 +231,8 @@ class YoloRTv2Criterion:
         any_empty = True
 
         for batch_index in range(batch_size):
-            target = targets[batch_index]
-            gt_boxes_norm = target["boxes"].to(pred_box.device)
+            target = normalized_targets[batch_index]
+            gt_boxes_norm = target.boxes.to(pred_box.device)
             pred_obj_b = pred_obj[batch_index].view(-1)
             pred_box_b = pred_box[batch_index]
             gt_obj = pred_obj_b.new_zeros((num_points,), dtype=torch.float32)

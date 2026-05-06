@@ -1,11 +1,11 @@
-"""ResNet backbone（来自 YOLORTv1，仅 layer1~3，输出 stride 16）。"""
+"""ResNet backbones for AFRIP dense detection models."""
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
 
-from afrip.models.registry import BACKBONES
 from afrip.models.common import (
+    BACKBONES,
     BasicBlock, Bottleneck, conv1x1, _adapt_first_conv_weight,
 )
 

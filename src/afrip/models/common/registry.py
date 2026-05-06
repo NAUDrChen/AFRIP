@@ -1,3 +1,4 @@
+"""Model registries and builders."""
 from __future__ import annotations
 
 from typing import Any
@@ -5,24 +6,16 @@ from typing import Any
 from afrip.core import Registry, build_from_config
 
 BACKBONES = Registry("backbones")
-NECKS     = Registry("necks")
-HEADS     = Registry("heads")
+NECKS = Registry("necks")
+HEADS = Registry("heads")
+COMMON_BLOCKS = Registry("common_blocks")
 DETECTORS = Registry("detectors")
-MATCHERS  = Registry("matchers")
-LOSSES    = Registry("losses")
-
-_LEGACY_DETECTOR_ALIASES: dict[str, dict[str, Any]] = {
-    "YOLORTv1": {"type": "UnifiedDenseDetector", "architecture": "yolort_v1"},
-    "YOLORTv2": {"type": "UnifiedDenseDetector", "architecture": "yolort_v2"},
-}
+MATCHERS = Registry("matchers")
+LOSSES = Registry("losses")
 
 
 def normalize_detector_config(config: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(config)
-    alias = _LEGACY_DETECTOR_ALIASES.get(str(normalized.get("type", "")))
-    if alias is None:
-        return normalized
-    return {**normalized, **alias}
+    return dict(config)
 
 
 def build_backbone(config: dict[str, Any], **extra_kwargs: Any) -> Any:
@@ -35,6 +28,10 @@ def build_neck(config: dict[str, Any], **extra_kwargs: Any) -> Any:
 
 def build_head(config: dict[str, Any], **extra_kwargs: Any) -> Any:
     return build_from_config(config, HEADS, **extra_kwargs)
+
+
+def build_common_block(config: dict[str, Any], **extra_kwargs: Any) -> Any:
+    return build_from_config(config, COMMON_BLOCKS, **extra_kwargs)
 
 
 def build_detector(config: dict[str, Any], **extra_kwargs: Any) -> Any:

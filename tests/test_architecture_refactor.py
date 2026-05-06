@@ -31,17 +31,17 @@ def test_radar_window_dataset_is_base_dataset() -> None:
     assert issubclass(RadarWindowDataset, BaseDataset)
 
 
-def test_unified_dense_detector_is_base_detector() -> None:
-    from afrip.models.detectors.assembly import UnifiedDenseDetector
+def test_configurable_detection_model_is_base_detector() -> None:
+    from afrip.models.common import ConfigurableDetectionModel
 
-    assert issubclass(UnifiedDenseDetector, BaseDetector)
+    assert issubclass(ConfigurableDetectionModel, BaseDetector)
 
 
-def test_legacy_detector_types_normalize_to_unified_assembly() -> None:
-    normalized = normalize_detector_config({"type": "YOLORTv2", "num_classes": 3})
+def test_detector_config_normalization_is_identity_for_explicit_config() -> None:
+    config = {"type": "ConfigurableDetectionModel", "num_classes": 3}
+    normalized = normalize_detector_config(config)
 
-    assert normalized["type"] == "UnifiedDenseDetector"
-    assert normalized["architecture"] == "yolort_v2"
+    assert normalized == config
 
 
 def test_strategies_exports_builders() -> None:

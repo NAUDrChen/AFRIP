@@ -1,8 +1,6 @@
 detector:
-  type: UnifiedDenseDetector
-  architecture: yolort_v1
+  type: ConfigurableDetectionModel
   num_classes: 3
-  stride: 16
   conf_thresh: 0.01
   nms_thresh: 0.5
   preprocessor_cfg:
@@ -20,21 +18,39 @@ detector:
     in_channels: 1
     pretrained: false
     pretrained_path: null
-  neck_cfg:
-    type: SPPF
-    in_dim: 256
-    out_dim: 512
-    expand_ratio: 0.5
-    pooling_size: 5
-    act_type: lrelu
-    norm_type: BN
-  head_cfg:
-    type: DecoupledHead
-    num_cls_head: 2
-    num_reg_head: 2
-    act_type: lrelu
-    norm_type: BN
-    depthwise: false
+  component_cfgs:
+    neck_main:
+      builder: neck
+      type: SPPF
+      in_dim: 256
+      out_dim: 512
+      expand_ratio: 0.5
+      pooling_size: 5
+      act_type: lrelu
+      norm_type: BN
+    head_shared:
+      builder: head
+      type: DecoupledHead
+      in_dim: 512
+      out_dim: 512
+      num_classes: 3
+      num_cls_head: 2
+      num_reg_head: 2
+      act_type: lrelu
+      norm_type: BN
+      depthwise: false
+  feature_nodes:
+    - name: p3
+      source:
+        type: backbone
+      ops:
+        - type: component
+          ref: neck_main
+  prediction_levels:
+    - name: p3
+      feature: p3
+      stride: 16
+      head_ref: head_shared
 
 loss:
   type: YoloRTCriterion

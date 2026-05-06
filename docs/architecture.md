@@ -8,7 +8,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 - `core/`：提供注册机制、构建逻辑和统一抽象
 - `datasets/`：管理数据加载、增强、采样和批处理
-- `models/`：承载检测器、跟踪器及共享子网络
+- `models/`：承载骨干、颈部、检测头、匹配器、损失、跟踪器及 common 装配/契约模块
 - `modules/`：容纳预处理、后处理、关联、滤波、神经网络等可重用模块
 - `engine/`：统一训练、评估和推理运行逻辑
 - `strategies/`：组织优化器、调度器、损失权重策略、预训练加载策略
@@ -21,6 +21,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - 数据处理与模型主体分离
 - 检测与跟踪既可独立运行，也可在实验层组合
 - 基础模块通过注册器按需构建，避免硬编码依赖
+- 检测模型装配通过配置图定义特征流、组件引用和预测层，不再为不同 detector 版本维护独立 Python 类
 - 脚本层只负责组装，不直接承载业务细节
 
 ## 4. 推荐扩展顺序
@@ -34,6 +35,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ## 5. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
+- `models/common/` 已集中承载 blocks、registry、contracts 与 config-driven detection assembly
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`

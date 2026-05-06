@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from afrip.models.registry import MATCHERS
+from afrip.models.common import MATCHERS, DetectionTarget, normalize_detection_targets
 
 
 @MATCHERS.register("YoloMatcher")
@@ -23,7 +23,7 @@ class YoloMatcher:
         self,
         fmp_size: tuple[int, int],
         stride: int,
-        targets: list[dict],
+        targets: list[DetectionTarget | dict],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """标签分配。
 
@@ -38,7 +38,8 @@ class YoloMatcher:
             gt_classes:    [B, HW, num_classes]
             gt_bboxes:     [B, HW, 4]  (x1y1x2y2，像素坐标)
         """
-        bs = len(targets)
+        normalized_targets = normalize_detection_targets(targets)
+        bs = len(normalized_targets)
         fmp_h, fmp_w = fmp_size
         i_h = fmp_h * stride
         i_w = fmp_w * stride
@@ -48,9 +49,9 @@ class YoloMatcher:
         gt_bboxes     = np.zeros([bs, fmp_h, fmp_w, 4])
 
         for batch_index in range(bs):
-            targets_per_image = targets[batch_index]
-            tgt_cls = targets_per_image["labels"].numpy()     # [N,]
-            tgt_box = targets_per_image["boxes"].numpy()      # [N, 4] cxcywh 归一化
+            targets_per_image = normalized_targets[batch_index]
+            tgt_cls = targets_per_image.labels.cpu().numpy()   # [N,]
+            tgt_box = targets_per_image.boxes.cpu().numpy()    # [N, 4] cxcywh 归一化
 
             for gt_box, gt_label in zip(tgt_box, tgt_cls):
                 cx, cy, bw, bh = gt_box
