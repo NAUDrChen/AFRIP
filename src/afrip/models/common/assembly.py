@@ -14,7 +14,6 @@ from .registry import (
     build_head,
     build_loss,
     build_neck,
-    normalize_detector_config,
 )
 
 
@@ -35,9 +34,9 @@ class ConfigurableDetectionModel(BaseDetector):
         backbone_cfg: dict[str, Any],
         neck_cfg: dict[str, Any],
         head_cfg: dict[str, Any],
+        preprocessor_cfg: dict[str, Any],
+        postprocessor_cfg: dict[str, Any],
         num_classes: int = 1,
-        preprocessor_cfg: dict[str, Any] | None = None,
-        postprocessor_cfg: dict[str, Any] | None = None,
         trainable: bool = False,
         deploy: bool = False,
     ) -> None:
@@ -46,19 +45,8 @@ class ConfigurableDetectionModel(BaseDetector):
         self.deploy = deploy
         self.set_training_behavior(trainable)
 
-        if preprocessor_cfg is None:
-            preprocessor_cfg = {"type": "TensorPreprocessor"}
-        self.preprocessor = build_preprocessor(preprocessor_cfg)
-
-        if postprocessor_cfg is None:
-            postprocessor_cfg = {"type": "YOLOObjectnessPostprocessor"}
-        else:
-            postprocessor_cfg = dict(postprocessor_cfg)
-
-        postprocessor_cfg.setdefault("type", "YOLOObjectnessPostprocessor")
-        postprocessor_cfg.setdefault("class_agnostic", True)
-        postprocessor_cfg.setdefault("num_classes", 1)
-        self.postprocessor = build_postprocessor(postprocessor_cfg)
+        self.preprocessor = build_preprocessor(dict(preprocessor_cfg))
+        self.postprocessor = build_postprocessor(dict(postprocessor_cfg))
 
         self.backbone = build_backbone(backbone_cfg)
         self.neck = build_neck(neck_cfg)
@@ -93,7 +81,7 @@ def assemble_detection_components(
     cfg: dict[str, Any],
     trainable: bool | None = None,
 ) -> tuple[Any, Any]:
-    detector_cfg = normalize_detector_config(dict(cfg["detector"]))
+    detector_cfg = dict(cfg["detector"])
     if trainable is not None:
         detector_cfg["trainable"] = trainable
 

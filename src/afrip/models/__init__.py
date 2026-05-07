@@ -3,7 +3,7 @@ from .common import (  # noqa: F401
     BACKBONES, NECKS, HEADS, DETECTORS, MATCHERS, LOSSES,
     COMMON_BLOCKS,
     build_detector, build_backbone, build_neck, build_head,
-    build_matcher, build_loss, build_common_block, normalize_detector_config,
+    build_matcher, build_loss, build_common_block,
     assemble_detection_components,
 )
 from .backbones import resnet         # noqa: F401  触发注册

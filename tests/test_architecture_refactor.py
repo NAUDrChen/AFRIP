@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
 from afrip.core import BaseDataset, BaseDetector
 from afrip.engine import DetectionRunner
-from afrip.models import normalize_detector_config
+from afrip.models import build_detector
 from afrip.strategies import build_optimizer, build_scheduler
 
 
@@ -37,10 +38,18 @@ def test_configurable_detection_model_is_base_detector() -> None:
     assert issubclass(ConfigurableDetectionModel, BaseDetector)
 
 
-def test_detector_config_normalization_is_identity_for_explicit_config() -> None:
+def test_build_detector_from_explicit_config() -> None:
     config = {
         "type": "ConfigurableDetectionModel",
         "num_classes": 3,
+        "preprocessor_cfg": {"type": "TensorPreprocessor"},
+        "postprocessor_cfg": {
+            "type": "YOLOObjectnessPostprocessor",
+            "conf_thresh": 0.01,
+            "nms_thresh": 0.5,
+            "class_agnostic": True,
+            "num_classes": 1,
+        },
         "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
         "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
         "head_cfg": {
@@ -50,16 +59,14 @@ def test_detector_config_normalization_is_identity_for_explicit_config() -> None
             "levels": [{"name": "p3", "stride": 16}],
         },
     }
-    normalized = normalize_detector_config(config)
+    detector = build_detector(config)
 
-    assert normalized == config
+    assert isinstance(detector, BaseDetector)
 
 
-def test_detector_config_normalization_moves_legacy_postprocessor_keys() -> None:
+def test_build_detector_requires_explicit_preprocessor_and_postprocessor() -> None:
     config = {
         "type": "ConfigurableDetectionModel",
-        "conf_thresh": 0.2,
-        "nms_thresh": 0.4,
         "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
         "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
         "head_cfg": {
@@ -70,12 +77,8 @@ def test_detector_config_normalization_moves_legacy_postprocessor_keys() -> None
         },
     }
 
-    normalized = normalize_detector_config(config)
-
-    assert "conf_thresh" not in normalized
-    assert "nms_thresh" not in normalized
-    assert normalized["postprocessor_cfg"]["conf_thresh"] == 0.2
-    assert normalized["postprocessor_cfg"]["nms_thresh"] == 0.4
+    with pytest.raises(TypeError):
+        build_detector(config)
 
 
 def test_strategies_exports_builders() -> None:

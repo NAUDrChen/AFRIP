@@ -25,7 +25,6 @@ from .registry import (  # noqa: F401
     build_loss,
     build_matcher,
     build_neck,
-    normalize_detector_config,
 )
 from .assembly import ConfigurableDetectionModel, assemble_detection_components  # noqa: F401
 
@@ -53,7 +52,6 @@ __all__ = [
     "build_loss",
     "build_matcher",
     "build_neck",
-    "normalize_detector_config",
     "ConfigurableDetectionModel",
     "assemble_detection_components",
 ]

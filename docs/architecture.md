@@ -103,7 +103,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
 - 训练轮数仅从 `strategy.train.max_epoch` 读取，训练恢复与评估 checkpoint 已拆分为 `strategy.train.resume` 和 `strategy.eval.checkpoint`
-- 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，旧的 detector 顶层后处理字段只在 `normalize_detector_config` 中做兼容迁移
+- 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，不再兼容 detector 顶层旧字段；检测器配置需显式声明 `preprocessor_cfg` 和 `postprocessor_cfg`
 - 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
 - `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
 - 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象
