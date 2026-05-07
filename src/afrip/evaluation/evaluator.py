@@ -19,15 +19,16 @@ class Evaluator:
              - ``strategy.eval.iou_thresh``  检测匹配 IoU 阈值，默认 0.5
              - ``strategy.eval.save_folder`` 权重保存目录
              - ``strategy.vis_pred_full``    是否可视化全帧预测
-             - ``detector.conf_thresh``      推理置信度阈值
+             - ``detector.postprocessor_cfg.conf_thresh`` 推理置信度阈值
     """
 
     def __init__(self, cfg: dict):
         self.cfg          = cfg
         eval_cfg          = cfg.get("strategy", {}).get("eval", {})
+        post_cfg          = cfg.get("detector", {}).get("postprocessor_cfg", {})
         self.iou_thresh   = eval_cfg.get("iou_thresh", 0.5)
         self.save_folder  = eval_cfg.get("save_folder", "outputs/weights")
-        self.conf_thresh  = cfg.get("detector", {}).get("conf_thresh", 0.01)
+        self.conf_thresh  = post_cfg.get("conf_thresh", 0.01)
         self.vis_full     = cfg.get("strategy", {}).get("vis_pred_full", False)
 
     @torch.no_grad()

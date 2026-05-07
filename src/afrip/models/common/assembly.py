@@ -36,13 +36,6 @@ class ConfigurableDetectionModel(BaseDetector):
         neck_cfg: dict[str, Any],
         head_cfg: dict[str, Any],
         num_classes: int = 1,
-        conf_thresh: float = 0.01,
-        nms_thresh: float = 0.5,
-        nms_type: str = "hard",
-        soft_nms_method: str = "linear",
-        soft_nms_sigma: float = 0.5,
-        soft_nms_score_thresh: float = 1e-3,
-        topk: int | None = None,
         preprocessor_cfg: dict[str, Any] | None = None,
         postprocessor_cfg: dict[str, Any] | None = None,
         trainable: bool = False,
@@ -50,8 +43,6 @@ class ConfigurableDetectionModel(BaseDetector):
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
-        self.conf_thresh = conf_thresh
-        self.nms_thresh = nms_thresh
         self.deploy = deploy
         self.set_training_behavior(trainable)
 
@@ -60,18 +51,11 @@ class ConfigurableDetectionModel(BaseDetector):
         self.preprocessor = build_preprocessor(preprocessor_cfg)
 
         if postprocessor_cfg is None:
-            postprocessor_cfg = {}
+            postprocessor_cfg = {"type": "YOLOObjectnessPostprocessor"}
         else:
             postprocessor_cfg = dict(postprocessor_cfg)
 
         postprocessor_cfg.setdefault("type", "YOLOObjectnessPostprocessor")
-        postprocessor_cfg["conf_thresh"] = conf_thresh
-        postprocessor_cfg["nms_thresh"] = nms_thresh
-        postprocessor_cfg["nms_type"] = nms_type
-        postprocessor_cfg["soft_nms_method"] = soft_nms_method
-        postprocessor_cfg["soft_nms_sigma"] = soft_nms_sigma
-        postprocessor_cfg["soft_nms_score_thresh"] = soft_nms_score_thresh
-        postprocessor_cfg["topk"] = topk
         postprocessor_cfg.setdefault("class_agnostic", True)
         postprocessor_cfg.setdefault("num_classes", 1)
         self.postprocessor = build_postprocessor(postprocessor_cfg)

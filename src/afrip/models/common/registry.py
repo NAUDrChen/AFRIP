@@ -13,9 +13,35 @@ DETECTORS = Registry("detectors")
 MATCHERS = Registry("matchers")
 LOSSES = Registry("losses")
 
+_POSTPROCESSOR_CONFIG_KEYS = (
+    "conf_thresh",
+    "nms_thresh",
+    "nms_type",
+    "soft_nms_method",
+    "soft_nms_sigma",
+    "soft_nms_score_thresh",
+    "topk",
+)
+
 
 def normalize_detector_config(config: dict[str, Any]) -> dict[str, Any]:
-    return dict(config)
+    normalized = dict(config)
+    legacy_post_keys = [key for key in _POSTPROCESSOR_CONFIG_KEYS if key in normalized]
+    post_cfg = normalized.get("postprocessor_cfg")
+    if post_cfg is not None:
+        post_cfg = dict(post_cfg)
+        post_cfg.setdefault("type", "YOLOObjectnessPostprocessor")
+    elif legacy_post_keys:
+        post_cfg = {"type": "YOLOObjectnessPostprocessor"}
+    else:
+        return normalized
+
+    for key in legacy_post_keys:
+        if key in normalized:
+            post_cfg.setdefault(key, normalized.pop(key))
+
+    normalized["postprocessor_cfg"] = post_cfg
+    return normalized
 
 
 def build_backbone(config: dict[str, Any], **extra_kwargs: Any) -> Any:

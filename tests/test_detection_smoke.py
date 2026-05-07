@@ -114,8 +114,8 @@ def test_detection_training_and_validation_smoke(tmp_path: Path, config_name: st
     cfg["strategy"]["eval"]["save_folder"] = str(tmp_path / "weights")
 
     detector_cfg = cfg["detector"]
-    detector_cfg["conf_thresh"] = 0.0
-    detector_cfg["nms_thresh"] = 0.5
+    detector_cfg["postprocessor_cfg"]["conf_thresh"] = 0.0
+    detector_cfg["postprocessor_cfg"]["nms_thresh"] = 0.5
 
     trainer = Trainer(cfg)
     evaluator = Evaluator(cfg)

@@ -59,9 +59,9 @@ def apply_overrides(cfg: dict, args: argparse.Namespace) -> None:
     if args.save_folder:
         _nested_set(cfg, ["strategy", "eval", "save_folder"], args.save_folder)
     if args.conf_thresh is not None:
-        _nested_set(cfg, ["detector", "conf_thresh"], args.conf_thresh)
+        _nested_set(cfg, ["detector", "postprocessor_cfg", "conf_thresh"], args.conf_thresh)
     if args.nms_thresh is not None:
-        _nested_set(cfg, ["detector", "nms_thresh"], args.nms_thresh)
+        _nested_set(cfg, ["detector", "postprocessor_cfg", "nms_thresh"], args.nms_thresh)
     if args.iou_thresh is not None:
         _nested_set(cfg, ["strategy", "eval", "iou_thresh"], args.iou_thresh)
 

@@ -1,17 +1,17 @@
 detector:
   type: ConfigurableDetectionModel
   num_classes: 3
-  conf_thresh: 0.01
-  nms_thresh: 0.5
-  nms_type: hard
-  soft_nms_method: linear
-  soft_nms_sigma: 0.5
-  soft_nms_score_thresh: 0.001
-  topk: null
   preprocessor_cfg:
     type: TensorPreprocessor
   postprocessor_cfg:
     type: YOLOObjectnessPostprocessor
+    conf_thresh: 0.01
+    nms_thresh: 0.5
+    nms_type: hard
+    soft_nms_method: linear
+    soft_nms_sigma: 0.5
+    soft_nms_score_thresh: 0.001
+    topk: null
     class_agnostic: true
     num_classes: 1
   trainable: false

@@ -55,6 +55,29 @@ def test_detector_config_normalization_is_identity_for_explicit_config() -> None
     assert normalized == config
 
 
+def test_detector_config_normalization_moves_legacy_postprocessor_keys() -> None:
+    config = {
+        "type": "ConfigurableDetectionModel",
+        "conf_thresh": 0.2,
+        "nms_thresh": 0.4,
+        "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
+        "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
+        "head_cfg": {
+            "type": "DenseDetectionHead",
+            "in_dim": 512,
+            "out_dim": 512,
+            "levels": [{"name": "p3", "stride": 16}],
+        },
+    }
+
+    normalized = normalize_detector_config(config)
+
+    assert "conf_thresh" not in normalized
+    assert "nms_thresh" not in normalized
+    assert normalized["postprocessor_cfg"]["conf_thresh"] == 0.2
+    assert normalized["postprocessor_cfg"]["nms_thresh"] == 0.4
+
+
 def test_strategies_exports_builders() -> None:
     assert callable(build_optimizer)
     assert callable(build_scheduler)
