@@ -28,96 +28,31 @@ detector:
     in_channels: 1
     pretrained: false
     pretrained_path: null
-  component_cfgs:
-    neck_main:
-      builder: neck
-      type: SPPF
-      in_dim: 256
-      out_dim: 512
-      expand_ratio: 0.5
-      pooling_size: 5
-      act_type: lrelu
-      norm_type: BN
-    p2_lateral:
-      builder: common
-      type: ConvBlock
-      in_channels: 128
-      out_channels: 512
-      k: 1
-      p: 0
-      s: 1
-      act_type: lrelu
-      norm_type: BN
-    p2_fuse:
-      builder: common
-      type: ConvBlock
-      in_channels: 1024
-      out_channels: 512
-      k: 3
-      p: 1
-      s: 1
-      act_type: lrelu
-      norm_type: BN
-    head_shared:
-      builder: head
-      type: DecoupledHead
-      in_dim: 512
-      out_dim: 512
-      num_classes: 3
-      num_cls_head: 2
-      num_reg_head: 2
-      act_type: lrelu
-      norm_type: BN
-      depthwise: false
-  feature_nodes:
-    - name: c3
-      source:
-        type: backbone
-        index: 0
-    - name: c4
-      source:
-        type: backbone
-        index: 1
-    - name: p3
-      source:
-        type: node
-        ref: c4
-      ops:
-        - type: component
-          ref: neck_main
-    - name: p2_lat
-      source:
-        type: node
-        ref: c3
-      ops:
-        - type: component
-          ref: p2_lateral
-    - name: p3_up
-      source:
-        type: node
-        ref: p3
-      ops:
-        - type: interpolate
-          like: p2_lat
-          mode: nearest
-    - name: p2
-      source:
-        type: nodes
-        refs: [p2_lat, p3_up]
-      ops:
-        - type: concat
-          dim: 1
-        - type: component
-          ref: p2_fuse
-  prediction_levels:
-    - name: p2
-      feature: p2
-      stride: 8
-      head_ref: head_shared
-    - name: p3
-      feature: p3
-      stride: 16
-      head_ref: head_shared
+  neck_cfg:
+    type: PyramidFusionNeck
+    low_in_dim: 128
+    high_in_dim: 256
+    out_dim: 512
+    low_output_name: p2
+    high_output_name: p3
+    expand_ratio: 0.5
+    pooling_size: 5
+    act_type: lrelu
+    norm_type: BN
+  head_cfg:
+    type: DenseDetectionHead
+    in_dim: 512
+    out_dim: 512
+    levels:
+      - name: p2
+        stride: 8
+      - name: p3
+        stride: 16
+    num_cls_head: 2
+    num_reg_head: 2
+    act_type: lrelu
+    norm_type: BN
+    depthwise: false
 
 loss:
   type: YoloRTv2Criterion

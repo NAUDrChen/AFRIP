@@ -8,7 +8,9 @@ from .common import (  # noqa: F401
 )
 from .backbones import resnet         # noqa: F401  触发注册
 from .necks import sppf               # noqa: F401
+from .necks import detection          # noqa: F401
 from .heads import decoupled_head     # noqa: F401
+from .heads import dense_detection    # noqa: F401
 from .matchers import yolo_matcher    # noqa: F401
 from .matchers import simota_matcher  # noqa: F401
 from .losses import detection_loss    # noqa: F401

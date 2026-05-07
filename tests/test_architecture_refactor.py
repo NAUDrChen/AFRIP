@@ -38,7 +38,18 @@ def test_configurable_detection_model_is_base_detector() -> None:
 
 
 def test_detector_config_normalization_is_identity_for_explicit_config() -> None:
-    config = {"type": "ConfigurableDetectionModel", "num_classes": 3}
+    config = {
+        "type": "ConfigurableDetectionModel",
+        "num_classes": 3,
+        "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
+        "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
+        "head_cfg": {
+            "type": "DenseDetectionHead",
+            "in_dim": 512,
+            "out_dim": 512,
+            "levels": [{"name": "p3", "stride": 16}],
+        },
+    }
     normalized = normalize_detector_config(config)
 
     assert normalized == config
