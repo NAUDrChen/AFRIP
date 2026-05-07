@@ -1,10 +1,7 @@
 """Reusable neural-network primitives for AFRIP models."""
 
-from afrip.models.registry import BLOCKS, build_block
-
 from .blocks import (
     Conv,
-    ConvBlock,
     BasicBlock,
     Bottleneck,
     conv1x1,
@@ -15,10 +12,7 @@ from .blocks import (
 )
 
 __all__ = [
-    "BLOCKS",
-    "build_block",
     "Conv",
-    "ConvBlock",
     "BasicBlock",
     "Bottleneck",
     "conv1x1",

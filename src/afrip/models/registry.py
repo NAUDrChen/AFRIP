@@ -5,7 +5,6 @@ from typing import Any
 
 from afrip.core import Registry, build_from_config
 
-BLOCKS = Registry("blocks")
 BACKBONES = Registry("backbones")
 NECKS = Registry("necks")
 HEADS = Registry("heads")
@@ -15,10 +14,6 @@ LOSSES = Registry("losses")
 PREPROCESSORS = Registry("preprocessors")
 POSTPROCESSORS = Registry("postprocessors")
 TRACKERS = Registry("trackers")
-
-
-def build_block(config: dict[str, Any], **extra_kwargs: Any) -> Any:
-    return build_from_config(config, BLOCKS, **extra_kwargs)
 
 
 def build_backbone(config: dict[str, Any], **extra_kwargs: Any) -> Any:

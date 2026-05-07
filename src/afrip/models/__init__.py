@@ -2,7 +2,6 @@
 
 from .registry import (  # noqa: F401
     BACKBONES,
-    BLOCKS,
     DETECTORS,
     ASSIGNERS,
     HEADS,
@@ -12,7 +11,6 @@ from .registry import (  # noqa: F401
     PREPROCESSORS,
     TRACKERS,
     build_backbone,
-    build_block,
     build_detector,
     build_assigner,
     build_head,
@@ -24,7 +22,6 @@ from .registry import (  # noqa: F401
 )
 from .blocks import (  # noqa: F401
     Conv,
-    ConvBlock,
     BasicBlock,
     Bottleneck,
     conv1x1,
@@ -38,7 +35,6 @@ from . import detection as _detection  # noqa: F401
 from . import tracking as _tracking  # noqa: F401
 
 __all__ = [
-    "BLOCKS",
     "BACKBONES",
     "NECKS",
     "HEADS",
@@ -48,7 +44,6 @@ __all__ = [
     "PREPROCESSORS",
     "POSTPROCESSORS",
     "TRACKERS",
-    "build_block",
     "build_backbone",
     "build_neck",
     "build_head",
@@ -59,7 +54,6 @@ __all__ = [
     "build_postprocessor",
     "build_tracker",
     "Conv",
-    "ConvBlock",
     "BasicBlock",
     "Bottleneck",
     "conv1x1",

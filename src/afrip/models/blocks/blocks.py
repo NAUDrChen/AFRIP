@@ -4,8 +4,6 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from afrip.models.registry import BLOCKS
-
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
     return nn.Conv2d(
@@ -107,35 +105,6 @@ class Conv(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.convs(x)
-
-
-@BLOCKS.register("ConvBlock")
-class ConvBlock(Conv):
-    """Registry-friendly alias for generic Conv block."""
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        k: int = 1,
-        p: int = 0,
-        s: int = 1,
-        d: int = 1,
-        act_type: str = "lrelu",
-        norm_type: str = "BN",
-        depthwise: bool = False,
-    ) -> None:
-        super().__init__(
-            c1=in_channels,
-            c2=out_channels,
-            k=k,
-            p=p,
-            s=s,
-            d=d,
-            act_type=act_type,
-            norm_type=norm_type,
-            depthwise=depthwise,
-        )
 
 
 class BasicBlock(nn.Module):
