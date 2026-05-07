@@ -9,14 +9,15 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - `strategy.eval` 统一承载评估 IoU、checkpoint 来源和权重输出目录
 - `dataloader` 仅保留 `batch_size` 与 `shuffle`
 - 后处理阈值和 NMS 策略统一放在 `detector.postprocessor_cfg`，检测模型主体不再声明这些后处理参数
+- 标签分配器配置统一放在 `loss.assigner_cfg`；检测域不再使用 `matcher_cfg` 旧命名
 
 ## 2. 代码分层
 
 - `core/`：只提供抽象基类、注册机制和无任务语义的 `build_from_config`
 - `datasets/`：管理数据加载、增强、采样和批处理
-- `models/`：作为模型域公共入口，统一提供模型侧注册表与 builder；`blocks/` 只承载纯神经网络原语
+- `models/`：作为模型域公共入口，统一提供检测/跟踪等任务域注册表与 builder；`blocks/` 只承载纯神经网络原语，不再单独维护 block registry
 - `models/detection/`：承载检测域组件，包括 backbones、necks、heads、detectors、assigners、losses、preprocessors、postprocessors
-- `models/tracking/`：承载跟踪域组件，包括 trackers 以及后续 motion、association、state estimator 等实现
+- `models/tracking/`：承载跟踪域组件；当前仍以占位入口为主，为后续 trackers、motion、association、state estimator 等实现预留空间
 - `engine/`：统一训练、评估和推理运行逻辑
 - `strategies/`：组织优化器、调度器、损失权重策略、预训练加载策略
 - `evaluation/`：沉淀任务指标、评测协议和分析工具
@@ -28,6 +29,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - 数据处理与模型主体分离
 - 检测与跟踪既可独立运行，也可在实验层组合
 - 基础模块通过注册器按需构建，避免硬编码依赖
+- 纯神经网络原语优先直接 import，不为 `Conv`、`BasicBlock` 这类基础 block 再额外维护配置注册层
 - 检测模型装配优先通过 backbone / neck / head 三段注册配置完成，不再把特征图路由、组件引用和预测层拆成零碎图节点配置
 - 脚本层只负责组装，不直接承载业务细节
 - 跨模块公共接口优先使用普通 `dict[str, Tensor]`，避免为数据语义再叠加一层契约封装
@@ -74,6 +76,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - `head` 输入统一为 `dict[str, torch.Tensor]`，其中每个特征图都遵循 `[B, C, H, W]`
 - `head` 训练态输出统一为普通 `dict`，当前检测主链至少包含：`pred_obj: [B, M, 1]`、`pred_box: [B, M, 4]`、`strides_all`、`fmp_sizes_all`
 - `head` 输出的 `pred_box` 必须已经 decode 到当前输入图像坐标系下的绝对 `xyxy`，后续损失、匹配和评估不再重复 decode
+- `assigner` 直接消费检测头输出和 `targets` 中的 `xyxy` GT；配置统一从 `loss.assigner_cfg` 读取
 - `postprocessor` 输入统一为单张图级别的 `boxes: [M, 4]` 和 `scores: [M]`，类型均为 `torch.Tensor`
 - `postprocessor` 输出统一为普通 `dict`，包含 `boxes: [K, 4]`、`scores: [K]`、`labels: [K]`
 - `postprocessor` 负责阈值过滤、框合法性过滤和 NMS；检测模型主体不再承载这些后处理细节
@@ -102,6 +105,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ### 4.7 训练、分配、评估中的统一语义
 
 - 标签分配器和损失函数直接消费 `targets[i]["boxes"]` 的 `xyxy` 表示
+- `assigner_cfg` 当前标准注册名为 `YoloAssigner`、`SimOTAAssigner`
 - 评估器直接消费 `batch["targets"]` 中的 `xyxy` GT 和模型推理返回的 `boxes`
 - `obj_id`、`batch_idx`、原始文件坐标等信息不再混入公共 box tensor；需要时放入 `meta` 或可视化专用结构
 
@@ -116,14 +120,15 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ## 6. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
-- `models/registry.py` 已统一承载模型侧注册表；`models/blocks/` 已收敛为纯神经网络原语层
+- `models/registry.py` 已统一承载检测/跟踪等任务域注册表；`models/blocks/` 已收敛为纯神经网络原语层，不再提供 `BLOCKS`、`build_block`、`ConvBlock` 这类 block registry 表面
 - `models/detection/` 已承载检测主链的 config-driven assembly、主干/颈部/检测头、assigner、loss、preprocessor 与 postprocessor
-- `models/tracking/` 已预留为跟踪域入口，避免检测与跟踪继续混放在同一平面目录下
+- `models/tracking/` 当前仍是占位入口，避免检测与跟踪继续混放在同一平面目录下，同时为后续 tracking 实现保留结构位置
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，优化器与调度器入口统一收口到 `afrip.strategies`
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
 - 训练轮数仅从 `strategy.train.max_epoch` 读取，训练恢复与评估 checkpoint 已拆分为 `strategy.train.resume` 和 `strategy.eval.checkpoint`
 - 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，不再兼容 detector 顶层旧字段；检测器配置需显式声明 `preprocessor_cfg` 和 `postprocessor_cfg`
+- 标签分配器参数仅从 `loss.assigner_cfg` 读取，不再使用 `matcher_cfg` 旧字段；检测域注册名已统一为 `*Assigner`
 - 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
 - `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
 - 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象

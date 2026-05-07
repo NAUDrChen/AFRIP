@@ -238,15 +238,26 @@ dataset:
 
 from afrip.core import Registry, build_from_config
 
-DETECTORS = Registry("detectors")
 BACKBONES = Registry("backbones")
 NECKS     = Registry("necks")
 HEADS     = Registry("heads")
+DETECTORS = Registry("detectors")
+ASSIGNERS = Registry("assigners")
+LOSSES    = Registry("losses")
+PREPROCESSORS = Registry("preprocessors")
+POSTPROCESSORS = Registry("postprocessors")
 TRACKERS  = Registry("trackers")
 
 def build_detector(config, **extra_kwargs):
     return build_from_config(config, DETECTORS, **extra_kwargs)
+
+def build_assigner(config, **extra_kwargs):
+    return build_from_config(config, ASSIGNERS, **extra_kwargs)
 ```
+
+当前 `models/registry.py` 只维护任务域组件的注册器。`models/blocks/` 中的 `Conv`、`BasicBlock`、`Bottleneck` 等纯神经网络原语不再走 registry，而是直接通过 Python import 使用。
+
+检测域配置中，标签分配器统一从 `loss.assigner_cfg` 构建；注册名当前使用 `YoloAssigner`、`SimOTAAssigner`。
 
 ---
 
