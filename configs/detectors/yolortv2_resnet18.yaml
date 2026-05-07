@@ -58,8 +58,8 @@ loss:
   assign_force_one: true
   assign_force_max_radius: 6
   assign_force_level: 0
-  matcher_cfg:
-    type: SimOTAMatcher
+  assigner_cfg:
+    type: SimOTAAssigner
     topk: 10
     center_radius: 2.5
     iou_weight: 3.0

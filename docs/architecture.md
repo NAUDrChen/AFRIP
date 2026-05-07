@@ -12,10 +12,11 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 ## 2. 代码分层
 
-- `core/`：提供注册机制、构建逻辑和统一抽象
+- `core/`：只提供抽象基类、注册机制和无任务语义的 `build_from_config`
 - `datasets/`：管理数据加载、增强、采样和批处理
-- `models/`：承载骨干、颈部、检测头、匹配器、损失、跟踪器及 common 下的 blocks / registry / config-driven assembly
-- `modules/`：容纳预处理、后处理、关联、滤波、神经网络等可重用模块
+- `models/`：作为模型域公共入口，统一提供模型侧注册表与 builder；`blocks/` 只承载纯神经网络原语
+- `models/detection/`：承载检测域组件，包括 backbones、necks、heads、detectors、assigners、losses、preprocessors、postprocessors
+- `models/tracking/`：承载跟踪域组件，包括 trackers 以及后续 motion、association、state estimator 等实现
 - `engine/`：统一训练、评估和推理运行逻辑
 - `strategies/`：组织优化器、调度器、损失权重策略、预训练加载策略
 - `evaluation/`：沉淀任务指标、评测协议和分析工具
@@ -115,7 +116,9 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ## 6. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
-- `models/common/` 已集中承载 blocks、registry 与 config-driven detection assembly，检测主链已统一为 backbone / neck / head 三段装配和普通字典张量接口
+- `models/registry.py` 已统一承载模型侧注册表；`models/blocks/` 已收敛为纯神经网络原语层
+- `models/detection/` 已承载检测主链的 config-driven assembly、主干/颈部/检测头、assigner、loss、preprocessor 与 postprocessor
+- `models/tracking/` 已预留为跟踪域入口，避免检测与跟踪继续混放在同一平面目录下
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，优化器与调度器入口统一收口到 `afrip.strategies`
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`

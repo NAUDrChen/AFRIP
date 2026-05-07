@@ -33,7 +33,7 @@ def test_radar_window_dataset_is_base_dataset() -> None:
 
 
 def test_configurable_detection_model_is_base_detector() -> None:
-    from afrip.models.common import ConfigurableDetectionModel
+    from afrip.models.detection import ConfigurableDetectionModel
 
     assert issubclass(ConfigurableDetectionModel, BaseDetector)
 

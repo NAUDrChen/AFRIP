@@ -26,3 +26,14 @@ def test_experiment_config_inheritance() -> None:
     assert config["strategy"]["train"]["max_epoch"] == 50
     assert config["strategy"]["train"]["resume"] is None
     assert config["strategy"]["eval"]["checkpoint"] is None
+
+
+def test_multiscale_detector_uses_assigner_cfg() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config_path = project_root / "configs" / "experiments" / "detection" / "radardet_yolortv2_sort.yaml"
+
+    config = load_config(config_path)
+
+    assert "matcher_cfg" not in config["loss"]
+    assert "assigner_cfg" in config["loss"]
+    assert config["loss"]["assigner_cfg"]["type"] == "SimOTAAssigner"

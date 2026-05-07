@@ -1,17 +1,72 @@
-"""Detection, tracking and shared model components."""
-from .common import (  # noqa: F401
-    BACKBONES, NECKS, HEADS, DETECTORS, MATCHERS, LOSSES,
-    COMMON_BLOCKS,
-    build_detector, build_backbone, build_neck, build_head,
-    build_matcher, build_loss, build_common_block,
-    assemble_detection_components,
+"""Model-domain public entrypoints, registries, and reusable primitives."""
+
+from .registry import (  # noqa: F401
+    BACKBONES,
+    BLOCKS,
+    DETECTORS,
+    ASSIGNERS,
+    HEADS,
+    LOSSES,
+    NECKS,
+    POSTPROCESSORS,
+    PREPROCESSORS,
+    TRACKERS,
+    build_backbone,
+    build_block,
+    build_detector,
+    build_assigner,
+    build_head,
+    build_loss,
+    build_neck,
+    build_postprocessor,
+    build_preprocessor,
+    build_tracker,
 )
-from .backbones import resnet         # noqa: F401  触发注册
-from .necks import sppf               # noqa: F401
-from .necks import detection          # noqa: F401
-from .heads import decoupled_head     # noqa: F401
-from .heads import dense_detection    # noqa: F401
-from .matchers import yolo_matcher    # noqa: F401
-from .matchers import simota_matcher  # noqa: F401
-from .losses import detection_loss    # noqa: F401
-from .losses import detection_loss_v2 # noqa: F401
+from .blocks import (  # noqa: F401
+    Conv,
+    ConvBlock,
+    BasicBlock,
+    Bottleneck,
+    conv1x1,
+    conv3x3,
+    get_activation,
+    get_norm,
+    _adapt_first_conv_weight,
+)
+from .detection import ConfigurableDetectionModel, assemble_detection_components  # noqa: F401
+from . import detection as _detection  # noqa: F401
+from . import tracking as _tracking  # noqa: F401
+
+__all__ = [
+    "BLOCKS",
+    "BACKBONES",
+    "NECKS",
+    "HEADS",
+    "DETECTORS",
+    "ASSIGNERS",
+    "LOSSES",
+    "PREPROCESSORS",
+    "POSTPROCESSORS",
+    "TRACKERS",
+    "build_block",
+    "build_backbone",
+    "build_neck",
+    "build_head",
+    "build_detector",
+    "build_assigner",
+    "build_loss",
+    "build_preprocessor",
+    "build_postprocessor",
+    "build_tracker",
+    "Conv",
+    "ConvBlock",
+    "BasicBlock",
+    "Bottleneck",
+    "conv1x1",
+    "conv3x3",
+    "get_activation",
+    "get_norm",
+    "_adapt_first_conv_weight",
+    "ConfigurableDetectionModel",
+    "assemble_detection_components",
+]
