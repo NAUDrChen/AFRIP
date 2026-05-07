@@ -16,7 +16,6 @@ dataset:
 
 dataloader:
   batch_size: 16
-  num_workers: 4
   shuffle: false
 
 train_transforms:

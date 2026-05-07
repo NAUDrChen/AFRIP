@@ -10,10 +10,13 @@ def test_experiment_config_inheritance() -> None:
     config = load_config(config_path)
 
     assert config["experiment"]["name"] == "radardet_rdcnn_sort"
-    assert config["runtime"]["max_epochs"] == 50
     assert config["runtime"]["work_dir"] == "outputs/radardet_rdcnn_sort"
+    assert "max_epochs" not in config["runtime"]
     assert config["detector"]["type"] == "ConfigurableDetectionModel"
     assert "neck_cfg" in config["detector"]
     assert "head_cfg" in config["detector"]
     assert "component_cfgs" not in config["detector"]
     assert config["strategy"]["optimizer"]["lr0"] == 0.0001
+    assert config["strategy"]["train"]["max_epoch"] == 50
+    assert config["strategy"]["train"]["resume"] is None
+    assert config["strategy"]["eval"]["checkpoint"] is None

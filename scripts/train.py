@@ -51,11 +51,11 @@ def apply_overrides(cfg: dict, args: argparse.Namespace) -> None:
     if args.batch_size:
         _nested_set(cfg, ["dataloader", "batch_size"], args.batch_size)
     if args.epochs:
-        _nested_set(cfg, ["runtime", "max_epochs"], args.epochs)
+        _nested_set(cfg, ["strategy", "train", "max_epoch"], args.epochs)
     if args.fp16:
         _nested_set(cfg, ["strategy", "train", "fp16"], True)
     if args.resume:
-        _nested_set(cfg, ["strategy", "eval", "resume"], args.resume)
+        _nested_set(cfg, ["strategy", "train", "resume"], args.resume)
     if args.save_folder:
         _nested_set(cfg, ["strategy", "eval", "save_folder"], args.save_folder)
     if args.conf_thresh is not None:

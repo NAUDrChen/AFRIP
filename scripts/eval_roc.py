@@ -46,14 +46,8 @@ def apply_overrides(cfg: dict, args: argparse.Namespace) -> None:
         _nested_set(cfg, ["runtime", "device"], args.device)
     if args.conf_thresh is not None:
         _nested_set(cfg, ["detector", "conf_thresh"], args.conf_thresh)
-        post_cfg = cfg.get("detector", {}).get("postprocessor_cfg")
-        if isinstance(post_cfg, dict):
-            post_cfg["conf_thresh"] = args.conf_thresh
     if args.nms_thresh is not None:
         _nested_set(cfg, ["detector", "nms_thresh"], args.nms_thresh)
-        post_cfg = cfg.get("detector", {}).get("postprocessor_cfg")
-        if isinstance(post_cfg, dict):
-            post_cfg["nms_thresh"] = args.nms_thresh
     if args.iou_thresh is not None:
         _nested_set(cfg, ["strategy", "eval", "iou_thresh"], args.iou_thresh)
     if args.vis_pred_full:
@@ -97,9 +91,9 @@ def resolve_checkpoint(cfg: dict, explicit_path: str | None) -> str:
             raise FileNotFoundError(f"checkpoint 不存在: {explicit_path}")
         return explicit_path
 
-    resume_path = cfg.get("strategy", {}).get("eval", {}).get("resume")
-    if resume_path and os.path.exists(resume_path):
-        return resume_path
+    checkpoint_path = cfg.get("strategy", {}).get("eval", {}).get("checkpoint")
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        return checkpoint_path
 
     save_folder = cfg.get("strategy", {}).get("eval", {}).get("save_folder")
     if save_folder and os.path.isdir(save_folder):
@@ -111,7 +105,7 @@ def resolve_checkpoint(cfg: dict, explicit_path: str | None) -> str:
         if candidates:
             return str(candidates[0])
 
-    raise FileNotFoundError("无法从 --checkpoint、strategy.eval.resume 或 save_folder 中解析 checkpoint")
+    raise FileNotFoundError("无法从 --checkpoint、strategy.eval.checkpoint 或 save_folder 中解析 checkpoint")
 
 
 def evaluate_single_experiment(config_path: str, checkpoint_path: str | None, args: argparse.Namespace) -> dict:

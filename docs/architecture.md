@@ -4,6 +4,12 @@
 
 AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器、训练策略彼此独立，在实验配置中通过 `_base_` 聚合。这种方式适合频繁切换模型、超参数与训练策略。
 
+- `runtime` 仅承载设备、随机种子、日志和输出目录等运行环境参数
+- `strategy.train` 统一承载训练轮数、混合精度、梯度裁剪、DataLoader worker 和训练恢复路径
+- `strategy.eval` 统一承载评估 IoU、checkpoint 来源和权重输出目录
+- `dataloader` 仅保留 `batch_size` 与 `shuffle`
+- 检测后处理阈值以 `detector` 顶层参数为唯一来源，`postprocessor_cfg` 只保留后处理器类型和专属开关
+
 ## 2. 代码分层
 
 - `core/`：提供注册机制、构建逻辑和统一抽象
@@ -96,6 +102,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
+- 训练轮数仅从 `strategy.train.max_epoch` 读取，训练恢复与评估 checkpoint 已拆分为 `strategy.train.resume` 和 `strategy.eval.checkpoint`
 - 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
 - `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
 - 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象

@@ -18,10 +18,11 @@ strategy:
     num_workers_train: 4
     num_workers_test: 0
     persistent_workers: false
+    resume: null
   eval:
     iou_thresh: 0.5
     save_folder: outputs/weights
-    resume: null
+    checkpoint: null
   vis_pred_full: false
 
 deterministic: false

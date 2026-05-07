@@ -60,18 +60,20 @@ class ConfigurableDetectionModel(BaseDetector):
         self.preprocessor = build_preprocessor(preprocessor_cfg)
 
         if postprocessor_cfg is None:
-            postprocessor_cfg = {
-                "type": "YOLOObjectnessPostprocessor",
-                "conf_thresh": conf_thresh,
-                "nms_thresh": nms_thresh,
-                "nms_type": nms_type,
-                "soft_nms_method": soft_nms_method,
-                "soft_nms_sigma": soft_nms_sigma,
-                "soft_nms_score_thresh": soft_nms_score_thresh,
-                "topk": topk,
-                "class_agnostic": True,
-                "num_classes": 1,
-            }
+            postprocessor_cfg = {}
+        else:
+            postprocessor_cfg = dict(postprocessor_cfg)
+
+        postprocessor_cfg.setdefault("type", "YOLOObjectnessPostprocessor")
+        postprocessor_cfg["conf_thresh"] = conf_thresh
+        postprocessor_cfg["nms_thresh"] = nms_thresh
+        postprocessor_cfg["nms_type"] = nms_type
+        postprocessor_cfg["soft_nms_method"] = soft_nms_method
+        postprocessor_cfg["soft_nms_sigma"] = soft_nms_sigma
+        postprocessor_cfg["soft_nms_score_thresh"] = soft_nms_score_thresh
+        postprocessor_cfg["topk"] = topk
+        postprocessor_cfg.setdefault("class_agnostic", True)
+        postprocessor_cfg.setdefault("num_classes", 1)
         self.postprocessor = build_postprocessor(postprocessor_cfg)
 
         self.backbone = build_backbone(backbone_cfg)

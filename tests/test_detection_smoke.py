@@ -94,10 +94,8 @@ def test_detection_training_and_validation_smoke(tmp_path: Path, config_name: st
     cfg = load_config(config_path)
 
     cfg["runtime"]["device"] = "cpu"
-    cfg["runtime"]["max_epochs"] = 1
     cfg["runtime"]["log_interval"] = 1000
     cfg["dataloader"]["batch_size"] = 1
-    cfg["dataloader"]["num_workers"] = 0
     cfg["dataloader"]["shuffle"] = False
     cfg["dataset"] = {
         "type": SMOKE_DATASET_TYPE,
@@ -107,6 +105,7 @@ def test_detection_training_and_validation_smoke(tmp_path: Path, config_name: st
     }
     cfg["train_transforms"] = []
     cfg["val_transforms"] = []
+    cfg["strategy"]["train"]["max_epoch"] = 1
     cfg["strategy"]["train"]["eval_interval"] = 1
     cfg["strategy"]["train"]["num_workers_train"] = 0
     cfg["strategy"]["train"]["num_workers_test"] = 0
@@ -117,9 +116,6 @@ def test_detection_training_and_validation_smoke(tmp_path: Path, config_name: st
     detector_cfg = cfg["detector"]
     detector_cfg["conf_thresh"] = 0.0
     detector_cfg["nms_thresh"] = 0.5
-    post_cfg = detector_cfg.get("postprocessor_cfg", {})
-    post_cfg["conf_thresh"] = 0.0
-    post_cfg["nms_thresh"] = 0.5
 
     trainer = Trainer(cfg)
     evaluator = Evaluator(cfg)

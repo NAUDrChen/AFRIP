@@ -7,8 +7,6 @@ detector:
     type: TensorPreprocessor
   postprocessor_cfg:
     type: YOLOObjectnessPostprocessor
-    conf_thresh: 0.01
-    nms_thresh: 0.5
     class_agnostic: true
     num_classes: 1
   trainable: false

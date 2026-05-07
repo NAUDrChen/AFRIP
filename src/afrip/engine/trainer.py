@@ -44,7 +44,7 @@ class Trainer:
             - ``detector``         探测器配置
             - ``loss``             损失函数配置
             - ``dataset``          数据集配置
-            - ``dataloader``       DataLoader 参数（batch_size、num_workers、shuffle）
+            - ``dataloader``       DataLoader 参数（batch_size、shuffle）
             - ``train_transforms`` 训练增强管线（列表）
             - ``val_transforms``   验证增强管线（列表，可选）
             - ``strategy``         含 optimizer / scheduler / train / eval 子字典
@@ -66,7 +66,7 @@ class Trainer:
             _set_seed(self._seed)
 
         # ── 训练超参 ─────────────────────────────────────────
-        self.max_epoch     = rt.get("max_epochs", train_cfg.get("max_epoch", 50))
+        self.max_epoch     = train_cfg.get("max_epoch", 50)
         self.fp16          = train_cfg.get("fp16", False)
         self.warmup_epoch  = train_cfg.get("warmup_epoch", 3)
         self.eval_interval = train_cfg.get("eval_interval", 5)
@@ -88,7 +88,7 @@ class Trainer:
 
         # ── 优化器 ───────────────────────────────────────────
         optim_cfg = strat.get("optimizer", {})
-        resume    = eval_cfg.get("resume", None)
+        resume    = train_cfg.get("resume", None)
         self.optimizer, self.start_epoch = build_optimizer(
             optim_cfg, self.model, resume
         )
@@ -143,9 +143,7 @@ class Trainer:
             _WORKER_BASE_SEED = self._seed
             worker_init_fn    = _dataloader_worker_init_fn
 
-        num_workers_train = train_cfg.get(
-            "num_workers_train", dl_cfg.get("num_workers", 0)
-        )
+        num_workers_train = train_cfg.get("num_workers_train", 0)
         persistent = train_cfg.get("persistent_workers", False)
         batch_size  = dl_cfg.get("batch_size", 4)
         shuffle     = dl_cfg.get("shuffle", True)
