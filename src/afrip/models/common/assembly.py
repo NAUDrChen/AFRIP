@@ -37,13 +37,9 @@ class ConfigurableDetectionModel(BaseDetector):
         preprocessor_cfg: dict[str, Any],
         postprocessor_cfg: dict[str, Any],
         num_classes: int = 1,
-        trainable: bool = False,
-        deploy: bool = False,
     ) -> None:
         super().__init__()
         self.num_classes = num_classes
-        self.deploy = deploy
-        self.set_training_behavior(trainable)
 
         self.preprocessor = build_preprocessor(dict(preprocessor_cfg))
         self.postprocessor = build_postprocessor(dict(postprocessor_cfg))
@@ -59,31 +55,25 @@ class ConfigurableDetectionModel(BaseDetector):
         return self.head(features)
 
     @torch.no_grad()
-    def inference(self, x: torch.Tensor) -> dict[str, torch.Tensor] | torch.Tensor:
+    def inference(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         outputs = self._run_dense_model(x)
         if outputs["pred_obj"].shape[0] != 1:
             raise ValueError("ConfigurableDetectionModel inference expects batch size 1")
 
         boxes = outputs["pred_box"][0]
         scores = outputs["pred_obj"][0].squeeze(-1).sigmoid()
-        if self.deploy:
-            return torch.cat([boxes, scores[:, None]], dim=-1)
-
         return self.postprocessor(boxes, scores)
 
     def forward(self, x: torch.Tensor):
-        if self.training_behavior_enabled:
+        if self.training:
             return self._run_dense_model(x)
         return self.inference(x)
 
 
 def assemble_detection_components(
     cfg: dict[str, Any],
-    trainable: bool | None = None,
 ) -> tuple[Any, Any]:
     detector_cfg = dict(cfg["detector"])
-    if trainable is not None:
-        detector_cfg["trainable"] = trainable
 
     detector = build_detector(detector_cfg)
 

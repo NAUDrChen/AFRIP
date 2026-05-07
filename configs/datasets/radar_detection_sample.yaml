@@ -15,7 +15,7 @@ dataset:
     uk: 2
 
 dataloader:
-  batch_size: 16
+  batch_size: 32
   shuffle: false
 
 train_transforms:

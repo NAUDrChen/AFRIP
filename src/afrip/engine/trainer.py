@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from afrip.core import BaseDataset, BaseDetector
+from afrip.core import BaseDataset
 from afrip.datasets import build_dataset, build_transform_pipeline
 from afrip.models import assemble_detection_components
 from afrip.strategies import build_optimizer, build_scheduler
@@ -78,13 +78,8 @@ class Trainer:
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.fp16)
 
         # ── 模型装配 ─────────────────────────────────────────
-        self.model, self.criterion = assemble_detection_components(
-            cfg,
-            trainable=True,
-        )
+        self.model, self.criterion = assemble_detection_components(cfg)
         self.model = self.model.to(self.device)
-        if isinstance(self.model, BaseDetector):
-            self.model.set_training_behavior(True)
 
         # ── 优化器 ───────────────────────────────────────────
         optim_cfg = strat.get("optimizer", {})
@@ -184,8 +179,6 @@ class Trainer:
     def train_one_epoch(self, epoch: int) -> None:
         """执行一个 epoch 的训练，含 warmup 学习率线性插值。"""
         self.model.train()
-        if isinstance(self.model, BaseDetector):
-            self.model.set_training_behavior(True)
 
         batch_size  = self.cfg.get("dataloader", {}).get("batch_size", 4)
         epoch_size  = len(self.train_loader)

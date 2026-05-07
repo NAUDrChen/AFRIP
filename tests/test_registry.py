@@ -13,7 +13,7 @@ def test_registry_build() -> None:
     assert instance.value == 7
 
 
-def test_base_detector_training_behavior() -> None:
+def test_base_detector_uses_pytorch_training_mode() -> None:
     class DemoDetector(BaseDetector):
         def inference(self, x):
             return x
@@ -22,7 +22,10 @@ def test_base_detector_training_behavior() -> None:
             return x
 
     detector = DemoDetector()
-    assert detector.training_behavior_enabled is False
+    assert detector.training is True
 
-    detector.set_training_behavior(True)
-    assert detector.training_behavior_enabled is True
+    detector.eval()
+    assert detector.training is False
+
+    detector.train()
+    assert detector.training is True

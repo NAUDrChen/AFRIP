@@ -62,7 +62,24 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 	- `batch_meta`: 长度为 `B` 的元信息列表
 - `batch` 不再额外暴露 `raw_boxes`、`batch_idx + box` 拼接张量或面向旧流程的框封装对象
 
-### 4.4 训练态模型输出
+### 4.4 模块边界张量约定
+
+- `preprocessor` 输入统一为 `torch.Tensor[B, C, H, W]`，输出也必须是 `torch.Tensor[B, C, H, W]`
+- `preprocessor` 只处理图像张量，不读取或改写 `boxes`、`labels`、`meta` 等监督信息
+- `backbone` 输入统一为 `torch.Tensor[B, C, H, W]`
+- `backbone` 输出允许为单个 `torch.Tensor`，也允许为按尺度排序的 `tuple[Tensor, ...]` / `list[Tensor]`；每个元素都必须保持批维在第 0 维、通道维在第 1 维
+- `neck` 输入消费 `backbone` 的原始输出，输出统一为 `dict[str, torch.Tensor]`
+- `neck` 输出字典的 key 表示语义特征层名，例如 `p2`、`p3`；value 统一为 `[B, C, H, W]`
+- `head` 输入统一为 `dict[str, torch.Tensor]`，其中每个特征图都遵循 `[B, C, H, W]`
+- `head` 训练态输出统一为普通 `dict`，当前检测主链至少包含：`pred_obj: [B, M, 1]`、`pred_box: [B, M, 4]`、`strides_all`、`fmp_sizes_all`
+- `head` 输出的 `pred_box` 必须已经 decode 到当前输入图像坐标系下的绝对 `xyxy`，后续损失、匹配和评估不再重复 decode
+- `postprocessor` 输入统一为单张图级别的 `boxes: [M, 4]` 和 `scores: [M]`，类型均为 `torch.Tensor`
+- `postprocessor` 输出统一为普通 `dict`，包含 `boxes: [K, 4]`、`scores: [K]`、`labels: [K]`
+- `postprocessor` 负责阈值过滤、框合法性过滤和 NMS；检测模型主体不再承载这些后处理细节
+- `tracker` 当前仅保留弱接口约定：输入应基于单帧检测结果和必要的帧级上下文，输出应为带 track id 的时序结果
+- 在 `tracker` 主链未稳定前，暂不把其内部状态张量形状、滤波状态维度或缓存结构写成强约束
+
+### 4.5 训练态模型输出
 
 - 训练态 `forward` 返回普通字典，不再返回额外包装对象
 - 当前检测主链统一输出：
@@ -72,7 +89,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 	- `fmp_sizes_all`: 每个预测层的特征图尺寸列表
 	- `stride`、`fmp_size`: 兼容单尺度损失读取的快捷字段
 
-### 4.5 推理态输出
+### 4.6 推理态输出
 
 - 推理态 `forward` / `inference` 返回普通字典：
 	- `boxes`: `[K, 4]`
@@ -81,7 +98,7 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - 后处理组件优先接收和返回 `torch.Tensor`
 - `utils/nms.py` 内部仍兼容 `numpy` 输入，但这属于兼容实现细节，不是主流程接口标准
 
-### 4.6 训练、分配、评估中的统一语义
+### 4.7 训练、分配、评估中的统一语义
 
 - 标签分配器和损失函数直接消费 `targets[i]["boxes"]` 的 `xyxy` 表示
 - 评估器直接消费 `batch["targets"]` 中的 `xyxy` GT 和模型推理返回的 `boxes`
@@ -100,13 +117,13 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
 - `models/common/` 已集中承载 blocks、registry 与 config-driven detection assembly，检测主链已统一为 backbone / neck / head 三段装配和普通字典张量接口
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
-- `strategies/` 已承接优化器与学习率调度器实现，`utils/solver` 仅保留兼容包装
+- `strategies/` 已承接优化器与学习率调度器实现，优化器与调度器入口统一收口到 `afrip.strategies`
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
 - 训练轮数仅从 `strategy.train.max_epoch` 读取，训练恢复与评估 checkpoint 已拆分为 `strategy.train.resume` 和 `strategy.eval.checkpoint`
 - 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，不再兼容 detector 顶层旧字段；检测器配置需显式声明 `preprocessor_cfg` 和 `postprocessor_cfg`
 - 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
 - `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
 - 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象
-- 检测器训练/推理模式切换已从隐式 `trainable` 属性迁移到显式接口
+- 检测器训练/推理模式切换统一复用 PyTorch 原生 `train()/eval()`；`forward()` 基于 `nn.Module.training` 在训练原始输出与推理后处理结果之间切换
 - `engine/runner.py` 已提供最小 `BaseRunner` / `DetectionRunner` 骨架，脚本入口已切换接入
 - 已补充训练/验证 smoke test，覆盖两条主实验配置在统一接口上的一轮真实执行

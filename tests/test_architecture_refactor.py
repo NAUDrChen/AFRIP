@@ -86,14 +86,6 @@ def test_strategies_exports_builders() -> None:
     assert callable(build_scheduler)
 
 
-def test_legacy_solver_wrappers_still_work() -> None:
-    from afrip.utils.solver import build_lr_scheduler as legacy_scheduler
-    from afrip.utils.solver import build_yolo_optimizer as legacy_optimizer
-
-    assert callable(legacy_optimizer)
-    assert callable(legacy_scheduler)
-
-
 def test_detection_runner_uses_trainer_and_evaluator_factories() -> None:
     class DummyTrainer:
         def __init__(self, cfg):

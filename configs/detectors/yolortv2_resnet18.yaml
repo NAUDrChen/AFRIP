@@ -14,8 +14,6 @@ detector:
     topk: null
     class_agnostic: true
     num_classes: 1
-  trainable: false
-  deploy: false
   backbone_cfg:
     type: ResNet18Pyramid
     in_channels: 1

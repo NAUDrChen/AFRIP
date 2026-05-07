@@ -6,7 +6,6 @@ import os
 import numpy as np
 import torch
 
-from afrip.core import BaseDetector
 from afrip.evaluation.map_metrics import MAPCalculator
 from afrip.evaluation.visualize import visualize_full_predictions, plot_roc_curve
 
@@ -91,11 +90,8 @@ class Evaluator:
         best_map: float,
         save_best: bool,
     ) -> dict:
+        prev_training_mode = model.training
         model.eval()
-        prev_training_behavior = None
-        if isinstance(model, BaseDetector):
-            prev_training_behavior = model.training_behavior_enabled
-            model.set_training_behavior(False)
 
         # ── 统计容器 ─────────────────────────────────────────
         ground_truth_data:    dict[str, list[dict]]  = {}
@@ -231,9 +227,7 @@ class Evaluator:
             print(f"[Eval] mAP={ap:.4f}, PD={pd:.4f}, PFA={pfa:.6f}")
 
         # ── 恢复模型训练状态 ──────────────────────────────────
-        if isinstance(model, BaseDetector) and prev_training_behavior is not None:
-            model.set_training_behavior(prev_training_behavior)
-        model.train()
+        model.train(prev_training_mode)
 
         # ── 可视化 ────────────────────────────────────────────
         if self.vis_full and prediction_records:

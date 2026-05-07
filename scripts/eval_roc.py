@@ -113,7 +113,7 @@ def evaluate_single_experiment(config_path: str, checkpoint_path: str | None, ar
     apply_overrides(cfg, args)
 
     device = torch.device(cfg.get("runtime", {}).get("device", "cpu"))
-    detector_cfg = {**cfg["detector"], "trainable": False, "deploy": False}
+    detector_cfg = dict(cfg["detector"])
     model = build_detector(detector_cfg).to(device)
 
     resolved_checkpoint = resolve_checkpoint(cfg, checkpoint_path)

@@ -18,18 +18,10 @@ class BaseDataset(Dataset, ABC):
 
 
 class BaseModel(nn.Module, ABC):
-    """AFRIP 可训练模型基础接口。"""
+    """AFRIP 可训练模型基础接口。
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._training_behavior_enabled = False
-
-    @property
-    def training_behavior_enabled(self) -> bool:
-        return self._training_behavior_enabled
-
-    def set_training_behavior(self, enabled: bool) -> None:
-        self._training_behavior_enabled = enabled
+    训练/推理分支统一复用 nn.Module 的 train()/eval() 状态。
+    """
 
 
 class BaseDetector(BaseModel, ABC):

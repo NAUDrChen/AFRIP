@@ -15,6 +15,8 @@ def test_experiment_config_inheritance() -> None:
     assert config["detector"]["type"] == "ConfigurableDetectionModel"
     assert "conf_thresh" not in config["detector"]
     assert "nms_thresh" not in config["detector"]
+    assert "trainable" not in config["detector"]
+    assert "deploy" not in config["detector"]
     assert "neck_cfg" in config["detector"]
     assert "head_cfg" in config["detector"]
     assert "component_cfgs" not in config["detector"]
