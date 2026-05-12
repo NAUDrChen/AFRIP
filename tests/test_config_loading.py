@@ -12,14 +12,19 @@ def test_experiment_config_inheritance() -> None:
     assert config["experiment"]["name"] == "radardet_rdcnn_sort"
     assert config["runtime"]["work_dir"] == "outputs/radardet_rdcnn_sort"
     assert "max_epochs" not in config["runtime"]
-    assert config["detector"]["type"] == "ConfigurableDetectionModel"
+    assert config["detector"]["type"] == "DetectionModel"
     assert "conf_thresh" not in config["detector"]
     assert "nms_thresh" not in config["detector"]
     assert "trainable" not in config["detector"]
     assert "deploy" not in config["detector"]
-    assert "neck_cfg" in config["detector"]
-    assert "head_cfg" in config["detector"]
+    assert "model_cfg" in config["detector"]
+    assert "backbone_cfg" not in config["detector"]
+    assert "neck_cfg" not in config["detector"]
+    assert "head_cfg" not in config["detector"]
     assert "component_cfgs" not in config["detector"]
+    assert config["detector"]["model_cfg"]["head"][-3][2] == "Detect"
+    assert config["detector"]["model_cfg"]["head"][-2][2] == "DetectDecode"
+    assert config["detector"]["model_cfg"]["head"][-1][2] == "DetectContract"
     assert config["detector"]["postprocessor_cfg"]["conf_thresh"] == 0.01
     assert config["detector"]["postprocessor_cfg"]["nms_thresh"] == 0.5
     assert config["strategy"]["optimizer"]["lr0"] == 0.0001
@@ -37,3 +42,6 @@ def test_multiscale_detector_uses_assigner_cfg() -> None:
     assert "matcher_cfg" not in config["loss"]
     assert "assigner_cfg" in config["loss"]
     assert config["loss"]["assigner_cfg"]["type"] == "SimOTAAssigner"
+    assert config["detector"]["model_cfg"]["head"][-3][2] == "Detect"
+    assert config["detector"]["model_cfg"]["head"][-2][2] == "DetectDecode"
+    assert config["detector"]["model_cfg"]["head"][-1][2] == "DetectContract"

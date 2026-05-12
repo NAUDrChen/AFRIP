@@ -20,7 +20,8 @@ AFRIP/
 ├─ src/afrip/               # 主代码包
 │  ├─ core/                 # 注册器、构建器、基础抽象
 │  ├─ datasets/             # 数据集、加载器、增强、采样器
-│  ├─ models/               # 模型域入口、纯 block 原语、detection/tracking 子域
+│  ├─ models/               # 模型域入口、任务域注册表、detection/tracking 子域
+│  ├─ nn/                   # ultralytics 风格 parse_model 与最小图节点模块
 │  ├─ engine/               # 训练/评估/推理执行引擎
 │  ├─ strategies/           # 优化器、调度器、训练策略、预训练加载策略
 │  ├─ evaluation/           # 指标、评测协议、可视化分析
@@ -43,11 +44,12 @@ pytest
 
 - `configs/base/`：运行时、设备、日志、输出等全局基础配置
 - `configs/datasets/`：数据源、切分、增强、采样与 dataloader 配置
-- `configs/detectors/`：检测模型结构与超参数
+- `configs/detectors/`：检测模型结构与超参数；结构主体由 `detector.model_cfg` 的 ultralytics 风格图配置描述
 - `configs/trackers/`：跟踪模型结构与超参数
 - `configs/strategies/`：训练策略、优化器、调度器、预训练加载策略
 - `configs/experiments/`：最终实验入口，使用 `_base_` 组合多个配置片段
 - 检测后处理配置统一放在 `detector.postprocessor_cfg`，标签分配器配置统一放在 `loss.assigner_cfg`
+- 检测 graph 内部节点由 `afrip.nn.parse_model()` 解析；当前主链使用通用 `Detect` 产生原始预测，由 `DetectDecode` 负责通用 box decode，再由 `DetectContract` 适配到 AFRIP 既有训练/推理输出契约
 
 ## 下一步建议
 

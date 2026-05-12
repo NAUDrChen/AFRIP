@@ -5,27 +5,12 @@ from typing import Any
 
 from afrip.core import Registry, build_from_config
 
-BACKBONES = Registry("backbones")
-NECKS = Registry("necks")
-HEADS = Registry("heads")
 DETECTORS = Registry("detectors")
 ASSIGNERS = Registry("assigners")
 LOSSES = Registry("losses")
 PREPROCESSORS = Registry("preprocessors")
 POSTPROCESSORS = Registry("postprocessors")
 TRACKERS = Registry("trackers")
-
-
-def build_backbone(config: dict[str, Any], **extra_kwargs: Any) -> Any:
-    return build_from_config(config, BACKBONES, **extra_kwargs)
-
-
-def build_neck(config: dict[str, Any], **extra_kwargs: Any) -> Any:
-    return build_from_config(config, NECKS, **extra_kwargs)
-
-
-def build_head(config: dict[str, Any], **extra_kwargs: Any) -> Any:
-    return build_from_config(config, HEADS, **extra_kwargs)
 
 
 def build_detector(config: dict[str, Any], **extra_kwargs: Any) -> Any:

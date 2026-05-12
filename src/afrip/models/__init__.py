@@ -1,66 +1,36 @@
 """Model-domain public entrypoints, registries, and reusable primitives."""
 
 from .registry import (  # noqa: F401
-    BACKBONES,
     DETECTORS,
     ASSIGNERS,
-    HEADS,
     LOSSES,
-    NECKS,
     POSTPROCESSORS,
     PREPROCESSORS,
     TRACKERS,
-    build_backbone,
     build_detector,
     build_assigner,
-    build_head,
     build_loss,
-    build_neck,
     build_postprocessor,
     build_preprocessor,
     build_tracker,
 )
-from .blocks import (  # noqa: F401
-    Conv,
-    BasicBlock,
-    Bottleneck,
-    conv1x1,
-    conv3x3,
-    get_activation,
-    get_norm,
-    _adapt_first_conv_weight,
-)
-from .detection import ConfigurableDetectionModel, assemble_detection_components  # noqa: F401
+from .detection import DetectionModel, assemble_detection_components  # noqa: F401
 from . import detection as _detection  # noqa: F401
 from . import tracking as _tracking  # noqa: F401
 
 __all__ = [
-    "BACKBONES",
-    "NECKS",
-    "HEADS",
     "DETECTORS",
     "ASSIGNERS",
     "LOSSES",
     "PREPROCESSORS",
     "POSTPROCESSORS",
     "TRACKERS",
-    "build_backbone",
-    "build_neck",
-    "build_head",
     "build_detector",
     "build_assigner",
     "build_loss",
     "build_preprocessor",
     "build_postprocessor",
     "build_tracker",
-    "Conv",
-    "BasicBlock",
-    "Bottleneck",
-    "conv1x1",
-    "conv3x3",
-    "get_activation",
-    "get_norm",
-    "_adapt_first_conv_weight",
-    "ConfigurableDetectionModel",
+    "DetectionModel",
     "assemble_detection_components",
 ]

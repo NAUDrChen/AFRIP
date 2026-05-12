@@ -33,14 +33,14 @@ def test_radar_window_dataset_is_base_dataset() -> None:
 
 
 def test_configurable_detection_model_is_base_detector() -> None:
-    from afrip.models.detection import ConfigurableDetectionModel
+    from afrip.models.detection import DetectionModel
 
-    assert issubclass(ConfigurableDetectionModel, BaseDetector)
+    assert issubclass(DetectionModel, BaseDetector)
 
 
 def test_build_detector_from_explicit_config() -> None:
     config = {
-        "type": "ConfigurableDetectionModel",
+        "type": "DetectionModel",
         "num_classes": 3,
         "preprocessor_cfg": {"type": "TensorPreprocessor"},
         "postprocessor_cfg": {
@@ -50,30 +50,50 @@ def test_build_detector_from_explicit_config() -> None:
             "class_agnostic": True,
             "num_classes": 1,
         },
-        "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
-        "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
-        "head_cfg": {
-            "type": "DenseDetectionHead",
-            "in_dim": 512,
-            "out_dim": 512,
-            "levels": [{"name": "p3", "stride": 16}],
+        "model_cfg": {
+            "in_channels": 1,
+            "backbone": [
+                [-1, 1, "Conv", [64, 7, 2, 3]],
+                [-1, 1, "nn.MaxPool2d", [3, 2, 1]],
+                [-1, 1, "C2f", [64, False]],
+                [-1, 1, "Conv", [128, 3, 2]],
+                [-1, 1, "C2f", [128, False]],
+                [-1, 1, "Conv", [256, 3, 2]],
+                [-1, 1, "C2f", [256, False]],
+            ],
+            "head": [
+                [-1, 1, "SPPF", [512, 5]],
+                [-1, 1, "Detect", [512, True]],
+                [-1, 1, "DetectDecode", [[{"name": "p3", "stride": 16}]]],
+                [-1, 1, "DetectContract", []],
+            ],
         },
     }
     detector = build_detector(config)
+    detector.train()
+    outputs = detector(torch.randn(1, 1, 64, 64))
 
     assert isinstance(detector, BaseDetector)
+    assert outputs["pred_obj"].shape[0] == 1
+    assert outputs["pred_box"].shape[0] == 1
+    assert outputs["stride"] == 16
 
 
 def test_build_detector_requires_explicit_preprocessor_and_postprocessor() -> None:
     config = {
-        "type": "ConfigurableDetectionModel",
-        "backbone_cfg": {"type": "ResNet18", "in_channels": 1},
-        "neck_cfg": {"type": "SingleScaleSPPFNeck", "in_dim": 256, "out_dim": 512},
-        "head_cfg": {
-            "type": "DenseDetectionHead",
-            "in_dim": 512,
-            "out_dim": 512,
-            "levels": [{"name": "p3", "stride": 16}],
+        "type": "DetectionModel",
+        "model_cfg": {
+            "in_channels": 1,
+            "backbone": [
+                [-1, 1, "Conv", [64, 7, 2, 3]],
+                [-1, 1, "nn.MaxPool2d", [3, 2, 1]],
+                [-1, 1, "C2f", [64, False]],
+            ],
+            "head": [
+                [-1, 1, "Detect", [256, True]],
+                [-1, 1, "DetectDecode", [[{"name": "p3", "stride": 4}]]],
+                [-1, 1, "DetectContract", []],
+            ],
         },
     }
 

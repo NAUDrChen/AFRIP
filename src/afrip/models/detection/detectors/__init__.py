@@ -1,5 +1,5 @@
 """Detection detector implementations."""
 
-from .configurable_detection import ConfigurableDetectionModel
+from .detection_model import DetectionModel
 
-__all__ = ["ConfigurableDetectionModel"]
+__all__ = ["DetectionModel"]

@@ -15,8 +15,9 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 - `core/`：只提供抽象基类、注册机制和无任务语义的 `build_from_config`
 - `datasets/`：管理数据加载、增强、采样和批处理
-- `models/`：作为模型域公共入口，统一提供检测/跟踪等任务域注册表与 builder；`blocks/` 只承载纯神经网络原语，不再单独维护 block registry
-- `models/detection/`：承载检测域组件，包括 backbones、necks、heads、detectors、assigners、losses、preprocessors、postprocessors
+- `models/`：作为模型域公共入口，统一提供检测/跟踪等任务域注册表与 builder；检测结构节点本身不再留在 `models/` 内
+- `nn/`：对齐 ultralytics 目录习惯，承载 `parse_model()`、`modules/conv.py`、`modules/block.py`、`modules/transformer.py` 和 AFRIP 检测 head 等最小图节点
+- `models/detection/`：承载检测域入口、assigners、losses、preprocessors、postprocessors；检测主干结构优先通过 `detector.model_cfg` + `afrip.nn.parse_model()` 解析
 - `models/tracking/`：承载跟踪域组件；当前仍以占位入口为主，为后续 trackers、motion、association、state estimator 等实现预留空间
 - `engine/`：统一训练、评估和推理运行逻辑
 - `strategies/`：组织优化器、调度器、损失权重策略、预训练加载策略
@@ -29,8 +30,8 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 - 数据处理与模型主体分离
 - 检测与跟踪既可独立运行，也可在实验层组合
 - 基础模块通过注册器按需构建，避免硬编码依赖
-- 纯神经网络原语优先直接 import，不为 `Conv`、`BasicBlock` 这类基础 block 再额外维护配置注册层
-- 检测模型装配优先通过 backbone / neck / head 三段注册配置完成，不再把特征图路由、组件引用和预测层拆成零碎图节点配置
+- 结构图节点统一收口到 `afrip.nn`；`Conv`、`C2f`、`SPPF`、`AIFI`、`Detect`、`DetectDecode`、`DetectContract` 等模块不再通过任务域 registry 暴露
+- 检测模型装配优先通过 `detector.model_cfg` 中的 `backbone + head` 图配置完成；内部节点按 ultralytics 风格 `(from, repeat, module, args)` 解析，不再把结构决策散落到 detector 构造代码里
 - 脚本层只负责组装，不直接承载业务细节
 - 跨模块公共接口优先使用普通 `dict[str, Tensor]`，避免为数据语义再叠加一层契约封装
 
@@ -69,13 +70,10 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 
 - `preprocessor` 输入统一为 `torch.Tensor[B, C, H, W]`，输出也必须是 `torch.Tensor[B, C, H, W]`
 - `preprocessor` 只处理图像张量，不读取或改写 `boxes`、`labels`、`meta` 等监督信息
-- `backbone` 输入统一为 `torch.Tensor[B, C, H, W]`
-- `backbone` 输出允许为单个 `torch.Tensor`，也允许为按尺度排序的 `tuple[Tensor, ...]` / `list[Tensor]`；每个元素都必须保持批维在第 0 维、通道维在第 1 维
-- `neck` 输入消费 `backbone` 的原始输出，输出统一为 `dict[str, torch.Tensor]`
-- `neck` 输出字典的 key 表示语义特征层名，例如 `p2`、`p3`；value 统一为 `[B, C, H, W]`
-- `head` 输入统一为 `dict[str, torch.Tensor]`，其中每个特征图都遵循 `[B, C, H, W]`
-- `head` 训练态输出统一为普通 `dict`，当前检测主链至少包含：`pred_obj: [B, M, 1]`、`pred_box: [B, M, 4]`、`strides_all`、`fmp_sizes_all`
-- `head` 输出的 `pred_box` 必须已经 decode 到当前输入图像坐标系下的绝对 `xyxy`，后续损失、匹配和评估不再重复 decode
+- `detector.model_cfg` 解析出的图节点统一消费并返回 `torch.Tensor[B, C, H, W]` 或其列表；跨层路由通过 `(from, repeat, module, args)` 声明
+- 当前 detector 末端拆成三段：`Detect` 负责产生原始 box / score tensors，`DetectDecode` 负责按 level stride 把 box decode 到绝对 `xyxy`，`DetectContract` 只保留 AFRIP 当前 loss 所需的输出适配
+- `DetectContract` 当前主链至少输出：`pred_obj: [B, M, 1]`、`pred_box: [B, M, 4]`、`strides_all`、`fmp_sizes_all`
+- `DetectDecode` 输出的 box 必须已经 decode 到当前输入图像坐标系下的绝对 `xyxy`，后续损失、匹配和评估不再重复 decode
 - `assigner` 直接消费检测头输出和 `targets` 中的 `xyxy` GT；配置统一从 `loss.assigner_cfg` 读取
 - `postprocessor` 输入统一为单张图级别的 `boxes: [M, 4]` 和 `scores: [M]`，类型均为 `torch.Tensor`
 - `postprocessor` 输出统一为普通 `dict`，包含 `boxes: [K, 4]`、`scores: [K]`、`labels: [K]`
@@ -120,18 +118,21 @@ AFRIP 采用组合式配置：基础运行时、数据、检测器、跟踪器�
 ## 6. 当前重构进展
 
 - `core/base.py` 已提供 `BaseDataset`、`BaseDetector`、`BaseTracker`、`BaseModel`
-- `models/registry.py` 已统一承载检测/跟踪等任务域注册表；`models/blocks/` 已收敛为纯神经网络原语层，不再提供 `BLOCKS`、`build_block`、`ConvBlock` 这类 block registry 表面
-- `models/detection/` 已承载检测主链的 config-driven assembly、主干/颈部/检测头、assigner、loss、preprocessor 与 postprocessor
+- `models/registry.py` 已收缩为检测/跟踪任务域注册表，只保留 detector、assigner、loss、preprocessor、postprocessor、tracker 等任务级入口
+- `nn/` 已引入 ultralytics 风格的 `parse_model()` 与 `modules/conv.py`、`modules/block.py`、`modules/transformer.py` 子集，检测结构开始向最小图节点收口
+- `models/detection/` 已承载检测主链入口、assigner、loss、preprocessor 与 postprocessor；旧的三段式 backbones / necks / heads 已删除，检测结构主路径已完全切换到 `detector.model_cfg`
+- 两个 detector YAML 目前已进一步收口为纯通用图节点组合：backbone 由 `Conv + nn.MaxPool2d + C2f` 组成，head 由 `Detect + DetectDecode + DetectContract` 组成
 - `models/tracking/` 当前仍是占位入口，避免检测与跟踪继续混放在同一平面目录下，同时为后续 tracking 实现保留结构位置
 - `strategies/` 已提供正式 `build_optimizer`、`build_scheduler` 入口
 - `strategies/` 已承接优化器与学习率调度器实现，优化器与调度器入口统一收口到 `afrip.strategies`
 - `engine/Trainer` 已改为通过数据集实例解析 `collate_fn`，不再直接依赖 `RadarWindowDataset`
 - 训练轮数仅从 `strategy.train.max_epoch` 读取，训练恢复与评估 checkpoint 已拆分为 `strategy.train.resume` 和 `strategy.eval.checkpoint`
-- 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，不再兼容 detector 顶层旧字段；检测器配置需显式声明 `preprocessor_cfg` 和 `postprocessor_cfg`
+- 检测后处理参数仅从 `detector.postprocessor_cfg` 读取，不再兼容 detector 顶层旧字段；检测器配置需显式声明 `preprocessor_cfg`、`postprocessor_cfg` 与 `model_cfg`
 - 标签分配器参数仅从 `loss.assigner_cfg` 读取，不再使用 `matcher_cfg` 旧字段；检测域注册名已统一为 `*Assigner`
 - 数据集、增强、训练、评估和后处理主链已统一为 `torch.Tensor + xyxy + plain dict` 接口
 - `datasets` 层当前标准输出为 `image / boxes / labels / meta`，`collate_fn` 当前标准输出为 `images / targets / batch_meta`
 - 检测器训练态输出和推理态输出都已切换为普通字典，不再在主链上传递额外契约对象
 - 检测器训练/推理模式切换统一复用 PyTorch 原生 `train()/eval()`；`forward()` 基于 `nn.Module.training` 在训练原始输出与推理后处理结果之间切换
+- 两个检测器 YAML 已切换为 ultralytics 风格 `backbone + head` 图配置，`Detect` 负责复用 ultralytics 风格 tower，`DetectDecode` 负责通用 box decode，`DetectContract` 负责维持现有 loss/assigner/postprocessor 所需的输出契约
 - `engine/runner.py` 已提供最小 `BaseRunner` / `DetectionRunner` 骨架，脚本入口已切换接入
 - 已补充训练/验证 smoke test，覆盖两条主实验配置在统一接口上的一轮真实执行

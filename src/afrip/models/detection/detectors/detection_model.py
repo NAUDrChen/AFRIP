@@ -1,4 +1,4 @@
-"""Config-driven detection model assembly and detector implementation."""
+"""Parsed-graph detection model implementation."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,25 +6,17 @@ from typing import Any
 import torch
 
 from afrip.core import BaseDetector
-from afrip.models.registry import (
-    DETECTORS,
-    build_backbone,
-    build_head,
-    build_neck,
-    build_postprocessor,
-    build_preprocessor,
-)
+from afrip.models.registry import DETECTORS, build_postprocessor, build_preprocessor
+from afrip.nn import ParsedModel
 
 
-@DETECTORS.register("ConfigurableDetectionModel")
-class ConfigurableDetectionModel(BaseDetector):
-    """Backbone-neck-head dense detector assembled from registered modules."""
+@DETECTORS.register("DetectionModel")
+class DetectionModel(BaseDetector):
+    """Parsed-graph dense detector assembled from an Ultralytics-style model config."""
 
     def __init__(
         self,
-        backbone_cfg: dict[str, Any],
-        neck_cfg: dict[str, Any],
-        head_cfg: dict[str, Any],
+        model_cfg: dict[str, Any],
         preprocessor_cfg: dict[str, Any],
         postprocessor_cfg: dict[str, Any],
         num_classes: int = 1,
@@ -34,22 +26,19 @@ class ConfigurableDetectionModel(BaseDetector):
 
         self.preprocessor = build_preprocessor(dict(preprocessor_cfg))
         self.postprocessor = build_postprocessor(dict(postprocessor_cfg))
-
-        self.backbone = build_backbone(backbone_cfg)
-        self.neck = build_neck(neck_cfg)
-        self.head = build_head(head_cfg, num_classes=num_classes)
+        parsed_cfg = dict(model_cfg)
+        parsed_cfg["nc"] = num_classes
+        self.model = ParsedModel(parsed_cfg, num_classes=num_classes)
 
     def _run_dense_model(self, x: torch.Tensor) -> dict[str, Any]:
         x = self.preprocessor(x)
-        backbone_outputs = self.backbone(x)
-        features = self.neck(backbone_outputs)
-        return self.head(features)
+        return self.model(x)
 
     @torch.no_grad()
     def inference(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         outputs = self._run_dense_model(x)
         if outputs["pred_obj"].shape[0] != 1:
-            raise ValueError("ConfigurableDetectionModel inference expects batch size 1")
+            raise ValueError("DetectionModel inference expects batch size 1")
 
         boxes = outputs["pred_box"][0]
         scores = outputs["pred_obj"][0].squeeze(-1).sigmoid()

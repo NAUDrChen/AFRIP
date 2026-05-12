@@ -238,9 +238,6 @@ dataset:
 
 from afrip.core import Registry, build_from_config
 
-BACKBONES = Registry("backbones")
-NECKS     = Registry("necks")
-HEADS     = Registry("heads")
 DETECTORS = Registry("detectors")
 ASSIGNERS = Registry("assigners")
 LOSSES    = Registry("losses")
@@ -255,9 +252,11 @@ def build_assigner(config, **extra_kwargs):
     return build_from_config(config, ASSIGNERS, **extra_kwargs)
 ```
 
-当前 `models/registry.py` 只维护任务域组件的注册器。`models/blocks/` 中的 `Conv`、`BasicBlock`、`Bottleneck` 等纯神经网络原语不再走 registry，而是直接通过 Python import 使用。
+当前 `models/registry.py` 只维护任务域组件的注册器。检测结构节点不再放在 `models/` 域内维护；`Conv`、`C2f`、`SPPF`、`AIFI`、`Detect`、`DetectDecode`、`DetectContract` 等图节点统一放在 `afrip.nn`，由 parser 直接解析和实例化。
 
 检测域配置中，标签分配器统一从 `loss.assigner_cfg` 构建；注册名当前使用 `YoloAssigner`、`SimOTAAssigner`。
+
+当前检测主路径中，结构本身不再通过 `build_backbone()` / `build_neck()` / `build_head()` 三段配置拼装，而是由 `detector.model_cfg` 交给 `afrip.nn.parse_model()` 解析成最小图节点。换句话说：registry 仍负责 detector、loss、assigner、preprocessor、postprocessor 这类任务域组件，而图内部模块完全交给 `afrip.nn`。
 
 ---
 
