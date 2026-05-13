@@ -11,7 +11,10 @@ import torch.nn as nn
 
 from .modules import (
     AIFI,
+    C2PSA,
     C2f,
+    C3,
+    C3k2,
     Concat,
     Conv,
     Detect,
@@ -49,12 +52,15 @@ def parse_model(
             Conv,
             DWConv,
             Bottleneck,
+            C3,
             C2f,
+            C2PSA,
+            C3k2,
             SPPF,
             ResNetLayer,
         }
     )
-    repeat_modules = frozenset({C2f})
+    repeat_modules = frozenset({C2f, C2PSA, C3, C3k2})
 
     for index, (from_idx, repeats, module_name, args) in enumerate(config["backbone"] + config["head"]):
         module_cls = _resolve_module(module_name)
@@ -139,7 +145,10 @@ def _resolve_module(name: str | type[nn.Module]) -> type[nn.Module]:
     modules = {
         "AIFI": AIFI,
         "Bottleneck": Bottleneck,
+        "C2PSA": C2PSA,
         "C2f": C2f,
+        "C3": C3,
+        "C3k2": C3k2,
         "Concat": Concat,
         "Conv": Conv,
         "Detect": Detect,

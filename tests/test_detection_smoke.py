@@ -86,6 +86,7 @@ if SMOKE_DATASET_TYPE not in DATASETS.list():
     [
         "radardet_rdcnn_sort.yaml",
         "radardet_yolortv2_sort.yaml",
+        "radardet_yolo26_sort.yaml",
     ],
 )
 def test_detection_training_and_validation_smoke(tmp_path: Path, config_name: str) -> None:

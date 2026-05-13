@@ -15,5 +15,7 @@ def assemble_detection_components(
     loss_cfg = dict(cfg["loss"])
     if "num_classes" not in loss_cfg:
         loss_cfg["num_classes"] = detector_cfg.get("num_classes", 1)
+    if loss_cfg.get("type") == "Yolo26Criterion" and "total_epochs" not in loss_cfg:
+        loss_cfg["total_epochs"] = cfg.get("strategy", {}).get("train", {}).get("max_epoch", 1)
     criterion = build_loss(loss_cfg)
     return detector, criterion

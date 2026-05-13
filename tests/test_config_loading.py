@@ -45,3 +45,19 @@ def test_multiscale_detector_uses_assigner_cfg() -> None:
     assert config["detector"]["model_cfg"]["head"][-3][2] == "Detect"
     assert config["detector"]["model_cfg"]["head"][-2][2] == "DetectDecode"
     assert config["detector"]["model_cfg"]["head"][-1][2] == "DetectContract"
+
+
+def test_yolo26_config_uses_task_aligned_loss() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config_path = project_root / "configs" / "experiments" / "detection" / "radardet_yolo26_sort.yaml"
+
+    config = load_config(config_path)
+
+    assert config["experiment"]["name"] == "radardet_yolo26_sort"
+    assert config["detector"]["model_cfg"]["head"][-3][2] == "Detect"
+    assert config["detector"]["model_cfg"]["head"][-2][2] == "DetectDecode"
+    assert config["detector"]["model_cfg"]["head"][-1][2] == "DetectContract"
+    assert config["detector"]["model_cfg"]["head"][-3][3][-1] is True
+    assert config["loss"]["type"] == "Yolo26Criterion"
+    assert config["loss"]["assigner_cfg"]["type"] == "TaskAlignedAssigner"
+    assert config["loss"]["one2one_assigner_cfg"]["type"] == "TaskAlignedAssigner"

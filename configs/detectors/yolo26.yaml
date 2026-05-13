@@ -1,0 +1,73 @@
+detector:
+  type: DetectionModel
+  num_classes: 3
+  preprocessor_cfg:
+    type: TensorPreprocessor
+  postprocessor_cfg:
+    type: YOLOObjectnessPostprocessor
+    conf_thresh: 0.01
+    nms_thresh: 0.5
+    nms_type: hard
+    soft_nms_method: linear
+    soft_nms_sigma: 0.5
+    soft_nms_score_thresh: 0.001
+    topk: null
+    class_agnostic: true
+    num_classes: 1
+  model_cfg:
+    in_channels: 1
+    depth_multiple: 0.50
+    width_multiple: 0.25
+    backbone:
+      - [-1, 1, Conv, [64, 3, 2]]
+      - [-1, 1, Conv, [128, 3, 2]]
+      - [-1, 2, C3k2, [256, false, 0.25]]
+      - [-1, 1, Conv, [256, 3, 2]]
+      - [-1, 2, C3k2, [512, false, 0.25]]
+      - [-1, 1, Conv, [512, 3, 2]]
+      - [-1, 2, C3k2, [512, true]]
+      - [-1, 1, Conv, [1024, 3, 2]]
+      - [-1, 2, C3k2, [1024, true]]
+      - [-1, 1, SPPF, [1024, 5, 3, true]]
+      - [-1, 2, C2PSA, [1024]]
+    head:
+      - [-1, 1, nn.Upsample, [null, 2, nearest]]
+      - [[-1, 6], 1, Concat, [1]]
+      - [-1, 2, C3k2, [512, true]]
+      - [-1, 1, nn.Upsample, [null, 2, nearest]]
+      - [[-1, 4], 1, Concat, [1]]
+      - [-1, 2, C3k2, [256, true]]
+      - [-1, 1, Conv, [256, 3, 2]]
+      - [[-1, 13], 1, Concat, [1]]
+      - [-1, 2, C3k2, [512, true]]
+      - [-1, 1, Conv, [512, 3, 2]]
+      - [[-1, 10], 1, Concat, [1]]
+      - [-1, 1, C3k2, [1024, true, 0.5, true]]
+      - [[16, 19, 22], 1, Detect, [null, false, 1, true]]
+      - [-1, 1, DetectDecode, [[{"name": "p3", "stride": 8}, {"name": "p4", "stride": 16}, {"name": "p5", "stride": 32}], dist, 1]]
+      - [-1, 1, DetectContract, []]
+
+loss:
+  type: Yolo26Criterion
+  num_classes: 3
+  reg_max: 1
+  end2end: true
+  loss_cls_weight: 0.5
+  loss_box_weight: 7.5
+  loss_dfl_weight: 1.5
+  one2many_weight: 0.8
+  one2one_weight: 0.2
+  one2many_final_weight: 0.1
+  assigner_cfg:
+    type: TaskAlignedAssigner
+    topk: 10
+    alpha: 0.5
+    beta: 6.0
+    stride: [8, 16, 32]
+  one2one_assigner_cfg:
+    type: TaskAlignedAssigner
+    topk: 7
+    topk2: 1
+    alpha: 0.5
+    beta: 6.0
+    stride: [8, 16, 32]

@@ -1,8 +1,14 @@
 """Ultralytics-style module exports used by AFRIP parsed models."""
 
 from .block import (
+    Attention,
     Bottleneck,
+    C2PSA,
     C2f,
+    C3,
+    C3k,
+    C3k2,
+    PSABlock,
     ResNetBlock,
     ResNetLayer,
     SPPF,
@@ -29,9 +35,14 @@ from .transformer import AIFI, LayerNorm2d, MLP, MLPBlock, TransformerBlock, Tra
 
 __all__ = [
     "AIFI",
+    "Attention",
     "autopad",
     "Bottleneck",
+    "C2PSA",
     "C2f",
+    "C3",
+    "C3k",
+    "C3k2",
     "CBAM",
     "ChannelAttention",
     "Concat",
@@ -50,6 +61,7 @@ __all__ = [
     "LightConv",
     "MLP",
     "MLPBlock",
+    "PSABlock",
     "RepConv",
     "ResNetBlock",
     "ResNetLayer",

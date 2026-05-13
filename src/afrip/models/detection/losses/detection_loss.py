@@ -29,7 +29,7 @@ class YoloRTCriterion:
         self.loss_obj_empty_factor  = loss_obj_empty_factor
 
         if assigner_cfg is not None:
-            self.assigner_impl = build_assigner(assigner_cfg)
+            self.assigne_impl = build_assigner(assigner_cfg)
         else:
             self.assigner_impl = YoloAssigner(num_classes=num_classes)
 

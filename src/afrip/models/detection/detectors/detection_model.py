@@ -37,6 +37,8 @@ class DetectionModel(BaseDetector):
     @torch.no_grad()
     def inference(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         outputs = self._run_dense_model(x)
+        if "one2one" in outputs:
+            outputs = outputs["one2one"]
         if outputs["pred_obj"].shape[0] != 1:
             raise ValueError("DetectionModel inference expects batch size 1")
 

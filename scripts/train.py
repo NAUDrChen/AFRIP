@@ -19,7 +19,7 @@ from afrip.evaluation import Evaluator
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AFRIP Radar Detection Training")
-    parser.add_argument("--config", default='./configs/experiments/detection/radardet_yolortv2_sort.yaml', help="实验配置 YAML 路径")
+    parser.add_argument("--config", default='./configs/experiments/detection/radardet_yolo26_sort.yaml', help="实验配置 YAML 路径")
     # 运行时覆盖（对应旧版 ExperimentConfig 字段）
     parser.add_argument("--device",      type=str,   default=None, help="覆盖设备 (cpu/cuda/cuda:0)")
     parser.add_argument("--batch_size",  type=int,   default=None, help="覆盖 batch size")

@@ -1,0 +1,25 @@
+_base_:
+  - ../../base/runtime.yaml
+  - ../../datasets/radar_detection_sample.yaml
+  - ../../detectors/yolo26.yaml
+  - ../../trackers/kalman_sort.yaml
+  - ../../strategies/detection_baseline.yaml
+
+experiment:
+  name: radardet_yolo26_sort
+  stage: detection_with_tracking_eval
+
+runtime:
+  work_dir: outputs/radardet_yolo26_sort
+
+strategy:
+  optimizer:
+    lr0: 0.0001
+  train:
+    eval_interval: 1
+    num_workers_train: 4
+  eval:
+    save_folder: outputs/radardet_yolo26_sort/weights
+  vis_pred_full: false
+
+deterministic: true
