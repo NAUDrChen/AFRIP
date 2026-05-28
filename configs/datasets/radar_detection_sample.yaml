@@ -15,7 +15,7 @@ dataset:
     uk: 2
 
 dataloader:
-  batch_size: 32
+  batch_size: 64
   shuffle: false
 
 train_transforms:
@@ -33,3 +33,5 @@ train_transforms:
 val_transforms:
   - type: AmplitudeNormalize
     mode: db_percentile
+  - type: PadToStride
+    stride: 32

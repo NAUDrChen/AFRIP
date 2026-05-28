@@ -61,3 +61,5 @@ def test_yolo26_config_uses_task_aligned_loss() -> None:
     assert config["loss"]["type"] == "Yolo26Criterion"
     assert config["loss"]["assigner_cfg"]["type"] == "TaskAlignedAssigner"
     assert config["loss"]["one2one_assigner_cfg"]["type"] == "TaskAlignedAssigner"
+    assert config["val_transforms"][-1]["type"] == "PadToStride"
+    assert config["val_transforms"][-1]["stride"] == 32
